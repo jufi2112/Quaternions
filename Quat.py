@@ -1,0 +1,324 @@
+"""
+    TODOs
+
+    - [] sub
+    - [] mul
+    - [] conjugate
+    - [] conjugate_p_by_Q
+    - [] rotate
+    - [] create from vector representation
+
+"""
+
+from __future__ import annotations
+import numpy as np
+from typing import Union, Tuple
+import math
+
+class Quat:
+    def __init__(self,
+                 a: Union[int, float, np.ndarray] = 0,
+                 b: Union[int, float] = 0,
+                 c: Union[int, float] = 0,
+                 d: Union[int, float] = 0
+                 ):
+        """
+            A class that represents a quaternion in the form
+            q = a + bi + cj + dk
+            Internally, uses numpy for calculations.
+
+        Params
+        ------
+            a (int or float or np.ndarray):
+                Parameter a or numpy array that contains all parameters of the quaternion. Defaults to 0
+            b (int or float):
+                Parameter b. Defaults to 0. Unused if a is a numpy array
+            c (int or float):
+                Parameter c.  Defaults to 0. Unused if a is a numpy array
+            d (int or float):
+                Parameter d.  Defaults to 0. Unused if a is a numpy array
+        """
+        if isinstance(a, np.ndarray):
+            self.quat_ = a.reshape(4).astype(np.float64)
+        else:
+            self.quat_ = np.asarray([a, b, c, d], dtype=np.float64)
+        # Overwrite static methods by member functions
+        self.norm = self._instance_norm
+        self.normalize = self._instance_normalize
+        self.add = self._instance_add
+
+
+    def __str__(self):
+        return f"Quaternion {self.quat_[0]} + {self.quat_[1]}i + {self.quat_[2]}j + {self.quat_[3]}k"
+
+
+    def __repr__(self):
+        return f"Quat({self.quat_[0]}, {self.quat_[1]}, {self.quat_[2]}, {self.quat_[3]})"
+
+
+    def __len__(self):
+        return self.norm()
+
+
+    def __add__(self, other: Union[Quat, np.ndarray]):
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+        return self.add(other)
+
+
+    def __radd__(self, other: Union[Quat, np.ndarray]):
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+        return self.add(other)
+
+
+    def __iadd__(self, other: Union[Quat, np.ndarray]):
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1:
+                if other.shape[0] > 1:
+                    raise ValueError(f"Inplace addition only possible for single quaternion, but got {other.shape[0]}")
+                else:
+                    other = other[0]
+        self.quat_ = self + other
+
+
+    def numpy(self) -> np.ndarray:
+        """
+            Returns the quaternion representation q = a + bi + cj + dk
+            as numpy array [a, b, c, d].
+
+        Returns
+        -------
+            np.ndarray: Quaternion representation
+        """
+        return self.quat_
+
+
+    def is_pure(self) -> bool:
+        """
+            Returns whether the quaternion is a pure quaternion (i.e. a=0)
+        """
+        return math.isclose(self.quat_[0], 0)
+
+
+    def represents_point(self) -> bool:
+        """
+            Returns whether the quaternion represents a point in 3D
+            This is equivalent to is_pure()
+        """
+        return self.is_pure()
+
+
+    def is_versor(self) -> bool:
+        """
+            Returns whether the quaternion is a versor (i.e. unit quaternion).
+        """
+        return math.isclose(self.norm(), 1)
+
+
+    def represents_rotation(self) -> bool:
+        """
+            Returns whether the quaternion represents a rotation in 3D.
+            This is equivalent to is_versor()
+        """
+        return self.is_versor()
+
+
+    def scalar(self) -> float:
+        """
+            Returns the scalar part of the quaternion
+        """
+        return self.quat_[0]
+
+
+    def vector(self) -> np.ndarray:
+        """
+            Returns the vector part of the quaternion
+        """
+        return self.quat_[1:]
+
+
+    def _instance_norm(self) -> float:
+        """
+            Returns the norm of this quaternion. The norm is given by
+            sqrt(a^2 + b^2 + c^2 + d^2)
+        """
+        return np.linalg.norm(self.numpy())
+
+
+    def _instance_normalize(self) -> Quat:
+        """
+            Normalizes this quaternion via q' = q / || q ||
+        """
+        return Quat(self.numpy() / self.norm())
+
+
+    def _instance_add(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Adds the given quaternion to this quaternion and returns the result.
+
+        Params
+        ------
+            other (Quat or np.ndarray):
+                The possibly batched Quaternion to add to this one
+
+        Returns
+        -------
+            Quat or np.ndarray: The result. If other is batched, returns an array of Quats
+        """
+        res = Quat.add(self, other)
+        if res.ndim == 1:
+            return Quat(res)
+        else:
+            return np.asarray([Quat(elem) for elem in res])
+
+
+    def normalize_(self):
+        """
+            Normalizes this quaternion.
+        """
+        self.quat_ = self.quat_ / self.norm()
+
+
+    def add_(self, other: Union[Quat, np.ndarray]):
+        """
+            Adds the given quaternion to this quaternion.
+        """
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1 and other.shape[0] != 1:
+                raise ValueError(f"Expected a single quaternion as argument, but got {other.shape[0]} quaternions.")
+        elif isinstance(other, Quat):
+            other = other.numpy()
+        else:
+            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+        self.quat_ = self.quat_ + other
+
+
+    @staticmethod
+    def _convert_and_align(q: Union[Quat, np.ndarray],
+                           p: Union[Quat, np.ndarray] = None
+                           ) -> Union[Tuple[np.ndarray, bool], Tuple[np.ndarray, bool, np.ndarray, bool]]:
+        if isinstance(q, Quat):
+            q = q.numpy()
+        q_single = False
+        if q.ndim == 1:
+            q_single = True
+            q = q.reshape(1, -1)
+
+        if p is not None:
+            if isinstance(p, Quat):
+                p = p.numpy()
+            p_single = False
+            if p.ndim == 1:
+                p_single = True
+                p = p.reshape(1, -1)
+
+            # Align arrays
+            if q.shape[0] == 1 and p.shape[0] > 1:
+                q = np.tile(q, (p.shape[0], 1))
+            if p.shape[0] == 1 and q.shape[0] > 1:
+                p = np.tile(p, (q.shape[0], 1))
+            assert q.shape[1] == p.shape[1] == 4, f"Both quaternions have to have 4 elements, got {q.shape[1]} and {p.shape[1]}"
+
+            return q, q_single, p, p_single
+        else:
+            assert q.shape[1] == 4, f"Quaternion has to have 4 elements, got {q.shape[1]}"
+            return q, q_single
+
+
+    @staticmethod
+    def norm(q: Union[Quat, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+            Returns the norm || q || of the given quaternion q = a + bi + cj + dk
+            with || q || = sqrt(a^2 + b^2 + c^2 + d^2)
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                The (possibly batched) quaternion(s) for which the norm should
+                be calculated.
+
+        Returns
+        -------
+            float or np.ndarray: Norm of the quaternion(s).
+        """
+        q, single = Quat._convert_and_align(q)
+        norm = np.linalg.norm(q, axis=1).reshape(-1, 1)
+        if single:
+            return norm[0]
+        return norm
+
+
+    @staticmethod
+    def normalize(q: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Normalizes (possibly batched) quaternion q
+        """
+        q, single = Quat._convert_and_align(q)
+        q_norm = q / Quat.norm(q)
+        if single:
+            return q_norm[0]
+        else:
+            return q_norm
+
+
+    @staticmethod
+    def hamilton_product(q: Union[Quat, np.ndarray], p: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Calculates the Hamilton product of (possibly batched) quaternions q and p
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                Possibly batched left-side quaternion.
+            p (Quat or np.ndarray):
+                Possibly batched right-side quaternion
+
+        Returns
+        -------
+            np.ndarray: The Hamilton product q * p
+        """
+        q, q_single, p, p_single = Quat._convert_and_align(q, p)
+        qa = q[:, 0].reshape(-1, 1)
+        qb = q[:, 1].reshape(-1, 1)
+        qc = q[:, 2].reshape(-1, 1)
+        qd = q[:, 3].reshape(-1, 1)
+        pa = p[:, 0].reshape(-1, 1)
+        pb = p[:, 1].reshape(-1, 1)
+        pc = p[:, 2].reshape(-1, 1)
+        pd = p[:, 3].reshape(-1, 1)
+        res = np.concatenate(
+            [
+                qa*pa - qb*pb - qc*pc - qd*pd,
+                qa*pb + qb*pa + qc*pd - qd*pc,
+                qa*pc - qb*pd + qc*pa + qd*pb,
+                qa*pd + qb*pc - qc*pb + qd*pa
+            ], axis=1, dtype=np.float64)
+        if q_single and p_single:
+            return res[0]
+        return res
+
+
+    @staticmethod
+    def add(q: Union[Quat, np.ndarray], p: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Adds both quaternions (q+p) = a1+a2 + (b1+b2)i + (c1+c2)j + (d1+d2)k
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                Possibly batched left-side quaternion
+            p (Quat or np.ndarray):
+                Possibly batched right-side quaternion
+
+        Returns
+        -------
+            np.ndarray: Sum q + p
+        """
+        q, q_single, p, p_single = Quat._convert_and_align(q, p)
+        res = q + p
+        if q_single and p_single:
+            return res[0]
+        return res
