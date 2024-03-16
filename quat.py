@@ -46,6 +46,8 @@ class Quat:
         self.norm = self._instance_norm
         self.normalize = self._instance_normalize
         self.add = self._instance_add
+        self.sub = self._instance_sub
+        self.conjugate = self._instance_conjugate
 
 
     def __str__(self):
@@ -56,32 +58,69 @@ class Quat:
         return f"Quat({self.quat_[0]}, {self.quat_[1]}, {self.quat_[2]}, {self.quat_[3]})"
 
 
-    def __len__(self):
-        return self.norm()
+    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
+        if len(args) == 2 and len(kwargs) == 0:
+            x = args[0]
+            y = args[1]
+            if isinstance(x, np.ndarray) and isinstance(y, Quat):
+                if ufunc is np.add:
+                    return y.__radd__(x)
+                if ufunc is np.subtract:
+                    return y.__rsub__(x)
+        return NotImplemented
 
 
     def __add__(self, other: Union[Quat, np.ndarray]):
         if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
-            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+            return NotImplemented
         return self.add(other)
 
 
     def __radd__(self, other: Union[Quat, np.ndarray]):
         if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
-            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+            return NotImplemented
         return self.add(other)
 
 
-    def __iadd__(self, other: Union[Quat, np.ndarray]):
+    def __iadd__(self, other: Union[Quat, np.ndarray]) -> Quat:
         if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
-            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+            return NotImplemented
         if isinstance(other, np.ndarray):
             if other.ndim > 1:
                 if other.shape[0] > 1:
                     raise ValueError(f"Inplace addition only possible for single quaternion, but got {other.shape[0]}")
                 else:
                     other = other[0]
-        self.quat_ = self + other
+        self = self.add(other)
+        return self
+
+
+    def __sub__(self, other: Union[Quat, np.ndarray]):
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            return NotImplemented
+        return self.sub(other)
+
+
+    def __rsub__(self, other: Union[Quat, np.ndarray]):
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            return NotImplemented
+        res = Quat.sub(other, self)
+        if res.ndim == 1:
+            return Quat(res)
+        return np.asarray([Quat(elem) for elem in res])
+
+
+    def __isub__(self, other: Union[Quat, np.ndarray]) -> Quat:
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            return NotImplemented
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1:
+                if other.shape[0] > 1:
+                    raise ValueError(f"Inplace subtraction only possible for single quaternion, but got {other.shape[0]}")
+                else:
+                    other = other[0]
+        self = self.sub(other)
+        return self
 
 
     def numpy(self) -> np.ndarray:
@@ -162,7 +201,7 @@ class Quat:
         Params
         ------
             other (Quat or np.ndarray):
-                The possibly batched Quaternion to add to this one
+                The possibly batched quaternion to add to this one
 
         Returns
         -------
@@ -175,6 +214,34 @@ class Quat:
             return np.asarray([Quat(elem) for elem in res])
 
 
+    def _instance_sub(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Subtracts the given quaternion from this quaternion and returns the result.
+
+        Params
+        ------
+            other (Quat or np.ndarray):
+                The possibly batched quaternion that should be subtracted from this one.
+
+        Returns
+        -------
+            Quat or np.ndarray: The result. If other is batched, returns an array of Quats
+        """
+        res = Quat.sub(self, other)
+        if res.ndim == 1:
+            return Quat(res)
+        else:
+            return np.asarray([Quat(elem) for elem in res])
+
+
+    def _instance_conjugate(self):
+        """
+            Returns the conjugate q* = a - bi - cj - dk
+            of this quaternion.
+        """
+        return Quat(Quat.conjugate(self))
+
+
     def normalize_(self):
         """
             Normalizes this quaternion.
@@ -182,7 +249,7 @@ class Quat:
         self.quat_ = self.quat_ / self.norm()
 
 
-    def add_(self, other: Union[Quat, np.ndarray]):
+    def add_(self, other: Union[Quat, np.ndarray]) -> Quat:
         """
             Adds the given quaternion to this quaternion.
         """
@@ -192,8 +259,31 @@ class Quat:
         elif isinstance(other, Quat):
             other = other.numpy()
         else:
-            raise TypeError(f"Expected type Quat or np.ndarray, but got {type(other)}")
+            return NotImplemented
         self.quat_ = self.quat_ + other
+        return self
+
+
+    def sub_(self, other: Union[Quat, np.ndarray]) -> Quat:
+        """
+            Subtracts the given quaternion from this quaternion.
+        """
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1 and other.shape[0] != 1:
+                raise ValueError(f"Expected a single quaternion as argument, but got {other.shape[0]} quaternions.")
+        elif isinstance(other, Quat):
+            other = other.numpy()
+        else:
+            return NotImplemented
+        self.quat_ = self.quat_ - other
+        return self
+
+
+    def conjugate_(self):
+        """
+            Replace this quaternion by its conjugate.
+        """
+        self.quat_ = Quat.conjugate(self)
 
 
     @staticmethod
@@ -320,5 +410,50 @@ class Quat:
         q, q_single, p, p_single = Quat._convert_and_align(q, p)
         res = q + p
         if q_single and p_single:
+            return res[0]
+        return res
+
+    @staticmethod
+    def sub(q: Union[Quat, np.ndarray], p: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Subtracts quaternion p from quaternion q.
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                Quaternion from which should be subtracted
+            p (Quat or np.ndarray):
+                Quaternion which should be subtracted
+
+        Returns
+        -------
+            np.ndarray: q - p
+        """
+        q, q_single, p, p_single = Quat._convert_and_align(q, p)
+        res = q + (p * -1)
+        if q_single and p_single:
+            return res[0]
+        return res
+
+
+    @staticmethod
+    def conjugate(q: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Returns the conjugate q* of q = a + bi + cj + dk
+            with q* = a - bi - cj - dk
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                The possibly batched quaternion for which the
+                conjugate should be calculated
+
+        Returns
+        -------
+            np.ndarray: The conjugate
+        """
+        q, single = Quat._convert_and_align(q)
+        res = q * np.asarray([1, -1, -1, -1])
+        if single:
             return res[0]
         return res
