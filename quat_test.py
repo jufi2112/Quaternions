@@ -335,6 +335,46 @@ class TestQuat(unittest.TestCase):
         c = np.random.rand(10, 4)
         self.assertTrue(np.allclose(np.linalg.norm(c, axis=1).reshape(-1, 1), Quat.norm(c)), f"{np.linalg.norm(c, axis=1).reshape(-1, 1)} vs {Quat.norm(c)}")
 
+    def test_member_norm(self):
+        a = np.random.rand(4)
+        q = Quat(a)
+        self.assertTrue(np.allclose(np.linalg.norm(a), q.norm()))
+
+    def test_static_normalize(self):
+        a = np.random.rand(4)
+        q = Quat(a)
+        b = np.random.rand(10,4)
+        normalized = Quat.normalize(q)
+        self.assertIsInstance(normalized, np.ndarray)
+        self.assertTrue(np.isclose(np.linalg.norm(normalized), 1))
+        normalized = Quat.normalize(b)
+        self.assertIsInstance(normalized, np.ndarray)
+        for x in normalized:
+            self.assertTrue(np.isclose(np.linalg.norm(x), 1))
+
+    def test_member_normalize(self):
+        a = np.random.rand(4)
+        q = Quat(a)
+        p = q.normalize()
+        self.assertIsInstance(p, Quat)
+        self.assertTrue(np.isclose(p.norm(), 1))
+
+    def test_member_inplace_normalize(self):
+        a = np.random.rand(4)
+        q = Quat(a)
+        q.normalize_()
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.norm(), 1))
+
+    def test_normalize_value_error_on_zero(self):
+        q = Quat(0, 0, 0, 0)
+        self.assertRaises(ValueError, Quat.normalize, q)
+        self.assertRaises(ValueError, q.normalize)
+        self.assertRaises(ValueError, q.normalize_)
+        self.assertRaises(ValueError, Quat.normalize, np.zeros((10, 4)))
+        a = np.asarray([[1,1,1,1], [0,0,0,0]])
+        self.assertRaises(ValueError, Quat.normalize, a)
+
     def test_static_conjugate(self):
         a = np.random.rand(4)
         b = np.random.rand(10, 4)

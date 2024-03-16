@@ -135,6 +135,14 @@ class Quat:
         return self.quat_
 
 
+    def is_zero(self) -> bool:
+        """
+            Returns whether all coefficients are zero, i.e.
+            q = + + 0i + 0j + 0k
+        """
+        return np.isclose(self.norm(), 0)
+
+
     def is_pure(self) -> bool:
         """
             Returns whether the quaternion is a pure quaternion (i.e. a=0)
@@ -191,6 +199,8 @@ class Quat:
         """
             Normalizes this quaternion via q' = q / || q ||
         """
+        if self.is_zero():
+            raise ValueError(f"Cannot normalize quaternion {self} as it has zero length!")
         return Quat(self.numpy() / self.norm())
 
 
@@ -246,7 +256,10 @@ class Quat:
         """
             Normalizes this quaternion.
         """
+        if self.is_zero():
+            raise ValueError(f"Cannot normalize quaternion {self} since it has zero length!")
         self.quat_ = self.quat_ / self.norm()
+        return self
 
 
     def add_(self, other: Union[Quat, np.ndarray]) -> Quat:
@@ -284,6 +297,7 @@ class Quat:
             Replace this quaternion by its conjugate.
         """
         self.quat_ = Quat.conjugate(self)
+        return self
 
 
     @staticmethod
@@ -347,11 +361,14 @@ class Quat:
             Normalizes (possibly batched) quaternion q
         """
         q, single = Quat._convert_and_align(q)
-        q_norm = q / Quat.norm(q)
+        q_norm = Quat.norm(q)
+        if np.isclose(q_norm, 0).any():
+            raise ValueError("Quaternion has zero length, cannot perform normalization!")
+        q_normalized = q / q_norm
         if single:
-            return q_norm[0]
+            return q_normalized[0]
         else:
-            return q_norm
+            return q_normalized
 
 
     @staticmethod
