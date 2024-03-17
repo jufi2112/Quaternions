@@ -15,10 +15,12 @@ class TestQuat(unittest.TestCase):
         b = Quat(a[0], a[1], a[2], a[3])
         self.assertTrue((b.numpy() == a).all())
 
+
     def test_repr(self):
         a = np.random.rand(4) - 0.5
         b = Quat(a)
         self.assertEqual(b.__repr__(), f"Quat({a[0]}, {a[1]}, {a[2]}, {a[3]})")
+
 
     def test_str(self):
         a = np.random.rand(4) - 0.5
@@ -36,6 +38,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(c, np.ndarray, "Addition is not a numpy array")
         self.assertTrue((c == (a+b)).all(), "Addition is not correct")
 
+
     def test_static_add_single_quat(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -44,6 +47,7 @@ class TestQuat(unittest.TestCase):
         e = Quat.add(c, d)
         self.assertIsInstance(e, np.ndarray)
         self.assertTrue((e == (a+b)).all())
+
 
     def test_static_add_multiple_numpy(self):        
         for i in range(10):
@@ -67,6 +71,7 @@ class TestQuat(unittest.TestCase):
             self.assertIsInstance(c, np.ndarray)
             self.assertTrue((c == (a+b)).all())
 
+
     def test_static_add_single_mixed(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -78,6 +83,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(d, np.ndarray)
         self.assertTrue((e == (a+b)).all())
 
+
     def test_static_add_multiple_mixed(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(3, 4) - 0.5
@@ -88,6 +94,7 @@ class TestQuat(unittest.TestCase):
         self.assertTrue((d == (a+b)).all())
         self.assertIsInstance(e, np.ndarray)
         self.assertTrue((e == (a+b)).all())
+
 
     def test_member_add_single(self):
         a = np.random.rand(4) - 0.5
@@ -102,6 +109,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(e, Quat)
         self.assertTrue((e.numpy() == a+b).all())
 
+
     def test_member_add_multiple(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
@@ -112,6 +120,7 @@ class TestQuat(unittest.TestCase):
         for idx, x in enumerate(c):
             self.assertIsInstance(x, Quat)
             self.assertTrue((x.numpy() == a+b[idx]).all())
+
 
     def test_member_add_inplace(self):
         a = np.random.rand(4) - 0.5
@@ -129,6 +138,7 @@ class TestQuat(unittest.TestCase):
         q.add_(c)
         self.assertRaises(ValueError, q.add_, np.random.rand(2, 4) - 0.5)
 
+
     def test_operator_add_single(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -141,6 +151,7 @@ class TestQuat(unittest.TestCase):
         self.assertTrue((c.numpy() == a+b).all())
         self.assertTrue((d.numpy() == b+a).all())
         self.assertTrue((c.numpy() == d.numpy()).all())
+
 
     def test_operator_add_multiple(self):
         a = np.random.rand(4) - 0.5
@@ -157,6 +168,7 @@ class TestQuat(unittest.TestCase):
             self.assertIsInstance(x, Quat)
             self.assertTrue((x.numpy() == b[idx]+a).all())
 
+
     def test_operator_add_inplace(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
@@ -165,7 +177,7 @@ class TestQuat(unittest.TestCase):
         q += p
         self.assertIsInstance(q, Quat)
         self.assertTrue((q.numpy() == a+b).all())
-    
+
     ###############################
     #   End Testing of Addition   #
     ###############################
@@ -185,6 +197,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(d, np.ndarray)
         self.assertTrue((d == b-a).all())
 
+
     def test_static_sub_single_quat(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -196,6 +209,7 @@ class TestQuat(unittest.TestCase):
         f = Quat.sub(d, c)
         self.assertIsInstance(f, np.ndarray)
         self.assertTrue((f == b-a).all())
+
 
     def test_static_sub_multiple_numpy(self):        
         for i in range(10):
@@ -225,6 +239,7 @@ class TestQuat(unittest.TestCase):
             self.assertIsInstance(d, np.ndarray)
             self.assertTrue((d == b-a).all())
 
+
     def test_static_sub_single_mixed(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -236,6 +251,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(d, np.ndarray)
         self.assertTrue((e == (b-a)).all())
 
+
     def test_static_sub_multiple_mixed(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(3, 4) - 0.5
@@ -246,6 +262,7 @@ class TestQuat(unittest.TestCase):
         self.assertTrue((d == (a-b)).all())
         self.assertIsInstance(e, np.ndarray)
         self.assertTrue((e == (b-a)).all())
+
 
     def test_member_sub_single(self):
         a = np.random.rand(4) - 0.5
@@ -260,6 +277,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(e, Quat)
         self.assertTrue((e.numpy() == a-b).all())
 
+
     def test_member_sub_multiple(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
@@ -270,6 +288,7 @@ class TestQuat(unittest.TestCase):
         for idx, x in enumerate(c):
             self.assertIsInstance(x, Quat)
             self.assertTrue((x.numpy() == a-b[idx]).all())
+
 
     def test_member_sub_inplace(self):
         a = np.random.rand(4) - 0.5
@@ -287,6 +306,7 @@ class TestQuat(unittest.TestCase):
         q.sub_(c)
         self.assertRaises(ValueError, q.sub_, np.random.rand(2, 4) - 0.5)
 
+
     def test_operator_sub_single(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(4) - 0.5
@@ -298,6 +318,7 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(d, Quat)
         self.assertTrue((c.numpy() == a-b).all())
         self.assertTrue((d.numpy() == b-a).all())
+
 
     def test_operator_sub_multiple(self):
         a = np.random.rand(4) - 0.5
@@ -314,6 +335,7 @@ class TestQuat(unittest.TestCase):
             self.assertIsInstance(x, Quat)
             self.assertTrue((x.numpy() == b[idx]-a).all())
 
+
     def test_operator_sub_inplace(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
@@ -327,9 +349,10 @@ class TestQuat(unittest.TestCase):
     #   End Testing of Subtraction   #
     ##################################
 
-    ###############################
-    #   Start Testing of Multiply #
-    ###############################
+
+    #################################
+    #   Start Testing of Multiply   #
+    #################################
 
     def test_static_scalar_multiply(self):
         q_single = Quat(np.random.rand(4) - 0.5)
@@ -376,6 +399,10 @@ class TestQuat(unittest.TestCase):
         self.assertRaises(ValueError, Quat.scalar_multiply, np.asarray(5), 1)
         self.assertRaises(ValueError, Quat.scalar_multiply, np.random.rand(2, 5), 1)
 
+    ###############################
+    #   End Testing of Multiply   #
+    ###############################
+
     def test_static_norm(self):
         a = np.random.rand(4) - 0.5
         b = Quat(a)
@@ -384,10 +411,12 @@ class TestQuat(unittest.TestCase):
         c = np.random.rand(10, 4) - 0.5
         self.assertTrue(np.allclose(np.linalg.norm(c, axis=1).reshape(-1, 1), Quat.norm(c)), f"{np.linalg.norm(c, axis=1).reshape(-1, 1)} vs {Quat.norm(c)}")
 
+
     def test_member_norm(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
         self.assertTrue(np.allclose(np.linalg.norm(a), q.norm()))
+
 
     def test_static_normalize(self):
         a = np.random.rand(4) - 0.5
@@ -401,6 +430,7 @@ class TestQuat(unittest.TestCase):
         for x in normalized:
             self.assertTrue(np.isclose(np.linalg.norm(x), 1))
 
+
     def test_member_normalize(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
@@ -408,12 +438,14 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(p, Quat)
         self.assertTrue(np.isclose(p.norm(), 1))
 
+
     def test_member_inplace_normalize(self):
         a = np.random.rand(4) - 0.5
         q = Quat(a)
         q.normalize_()
         self.assertIsInstance(q, Quat)
         self.assertTrue(np.isclose(q.norm(), 1))
+
 
     def test_normalize_value_error_on_zero(self):
         q = Quat(0, 0, 0, 0)
@@ -424,12 +456,14 @@ class TestQuat(unittest.TestCase):
         a = np.asarray([[1,1,1,1], [0,0,0,0]])
         self.assertRaises(ValueError, Quat.normalize, a)
 
+
     def test_static_conjugate(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(10, 4) - 0.5
         conj_arr = np.asarray([1, -1, -1, -1])
         self.assertTrue((a*conj_arr == Quat.conjugate(a)).all())
         self.assertTrue((b*conj_arr == Quat.conjugate(b)).all())
+
 
     def test_member_conjugate(self):
         a = np.random.rand(4) - 0.5
