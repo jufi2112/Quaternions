@@ -1,7 +1,6 @@
 """
     TODOs
 
-    - [] mul
     - [] conjugate_p_by_Q
     - [] rotate
     - [] create from vector representation
@@ -49,6 +48,7 @@ class Quat:
         self.sub = self._instance_sub
         self.conjugate = self._instance_conjugate
         self.scalar_multiply = self._instance_scalar_multiply
+        self.hamilton_product = self._instance_hamilton_product
 
 
     def __str__(self):
@@ -79,6 +79,8 @@ class Quat:
                     return y.__rsub__(x)
                 if ufunc is np.multiply:
                     return y.__rmul__(x)
+                if ufunc is np.matmul:
+                    return y.__rmatmul__(x)
         return NotImplemented
 
 
@@ -198,6 +200,69 @@ class Quat:
         return NotImplemented
 
 
+    def __matmul__(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        if isinstance(other, Quat):
+            return Quat(Quat.hamilton_product(self, other))
+        if isinstance(other, np.ndarray):
+            err_msg = f"Expected other quaternion to have shape (4) or (N, 4), got {other.shape}"
+            if other.ndim == 1:
+                if other.shape[0] == 4:
+                    return Quat(Quat.hamilton_product(self, other))
+                else:
+                    raise ValueError(err_msg)
+            elif other.ndim == 2:
+                if other.shape[1] == 4:
+                    res = Quat.hamilton_product(self, other)
+                    return np.asarray([Quat(elem) for elem in res])
+                else:
+                    raise ValueError(err_msg)
+            else:
+                raise ValueError(err_msg)
+        return NotImplemented
+
+
+    def __rmatmul__(self, other: np.ndarray) -> Union[Quat, np.ndarray]:
+        if isinstance(other, np.ndarray):
+            err_msg = f"Expected other quaternion to have shape (4) or (N, 4), got {other.shape}"
+            if other.ndim == 1:
+                if other.shape[0] == 4:
+                    return Quat(Quat.hamilton_product(other, self))
+                else:
+                    raise ValueError(err_msg)
+            elif other.ndim == 2:
+                if other.shape[1] == 4:
+                    res = Quat.hamilton_product(other, self)
+                    return np.asarray([Quat(elem) for elem in res])
+                else:
+                    raise ValueError(err_msg)
+            else:
+                raise ValueError(err_msg)
+        return NotImplemented
+
+
+    def __imatmul__(self, other: Union[Quat, np.ndarray]) -> Quat:
+        if isinstance(other, Quat):
+            self = self @ other
+            return self
+        if isinstance(other, np.ndarray):
+            err_msg = f"Expected other quaternion to have shape (4) or (1, 4), got {other.shape}"
+            if other.ndim == 1:
+                if other.shape[0] == 4:
+                    self = self @ other
+                    return self
+                else:
+                    raise ValueError(err_msg)
+            elif other.ndim == 2:
+                if other.shape[0] == 1 and other.shape[1] == 4:
+                    self = self @ other[0]
+                    return self
+                else:
+                    raise ValueError(err_msg)
+            else:
+                raise ValueError(err_msg)
+        return NotImplemented
+
+
     def numpy(self) -> np.ndarray:
         """
             Returns the quaternion representation q = a + bi + cj + dk
@@ -297,8 +362,7 @@ class Quat:
         res = Quat.add(self, other)
         if res.ndim == 1:
             return Quat(res)
-        else:
-            return np.asarray([Quat(elem) for elem in res])
+        return np.asarray([Quat(elem) for elem in res])
 
 
     def _instance_sub(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
@@ -319,8 +383,7 @@ class Quat:
         res = Quat.sub(self, other)
         if res.ndim == 1:
             return Quat(res)
-        else:
-            return np.asarray([Quat(elem) for elem in res])
+        return np.asarray([Quat(elem) for elem in res])
 
 
     def _instance_conjugate(self):
@@ -334,12 +397,49 @@ class Quat:
     def _instance_scalar_multiply(self, other: Union[int, float, np.ndarray]) -> Union[Quat, np.ndarray]:
         """
             Multiplies the given scalar s to this q: q * s = sa + sbi + scj + sdk
+
+        Params
+        ------
+            other (int or float or np.ndarray):
+                The scalar that should be multiplied to this quaternion. If multiple
+                scalars should be multiplied independently to q, provide a np.ndarray
+                of shape (N, 1)
+
+        Result
+        ------
+            Quat or np.ndarray:
+                The result s * q. If other is batched, the result is an np.ndarray
+                of Quats with shape (N)
         """
         res = Quat.scalar_multiply(self, other)
         if res.ndim == 1:
             return Quat(res)
-        else:
-            return np.asarray([Quat(elem) for elem in res])
+        return np.asarray([Quat(elem) for elem in res])
+
+
+    def _instance_hamilton_product(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Calculates the (possibly batched) hamilton product q @ other between
+            this quaternion q and the given quaternion parameter other.
+
+        Params
+        ------
+            other (Quat or np.ndarray):
+                The quaternion that should be multiplied to the right side of this
+                quaternion. If other should be multiple quaternions that are to be
+                independently multiplied to q, provide other as shape (N, 4).
+
+        Returns
+        -------
+            Quat or np.ndarray:
+                The result q @ other. If other is batched, the result is an
+                np.ndarray of Quats with shape (N)
+        """
+        res = Quat.hamilton_product(self, other)
+        if res.ndim == 1:
+            return Quat(res)
+        return np.asarray([Quat(elem) for elem in res])
+
 
 
     def normalize_(self):
@@ -364,7 +464,7 @@ class Quat:
         elif isinstance(other, Quat):
             other = other.numpy()
         else:
-            return NotImplemented
+            raise TypeError(f"Expected parameter other to be of type Quat or np.ndarray, got {type(other)}")
         self.quat_ = self.quat_ + other
         return self
 
@@ -381,7 +481,7 @@ class Quat:
         elif isinstance(other, Quat):
             other = other.numpy()
         else:
-            return NotImplemented
+            raise TypeError(f"Expected parameter other to be of type Quat or np.ndarray, got {type(other)}")
         self.quat_ = self.quat_ - other
         return self
 
@@ -408,6 +508,22 @@ class Quat:
         return self
 
 
+    def hamilton_product_(self, other: Union[Quat, np.ndarray]):
+        """
+            Replaces this quaternion q by q @ other.
+        """
+        if not isinstance(other, Quat) and not isinstance(other, np.ndarray):
+            raise TypeError(f"Expected parameter other to be of type Quat or np.ndarray, got {type(other)}")
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1 and other.shape[0] != 1:
+                raise ValueError(f"Expected a single quaternion as argument, but got {other.shape[0]} quaternions!")
+            if other.ndim == 2:
+                other = other[0]
+        self.quat_ = Quat.hamilton_product(self, other)
+        return self
+
+
+
     @staticmethod
     def _convert_and_align(q: Union[Quat, np.ndarray],
                            p: Union[Quat, np.ndarray] = None
@@ -432,11 +548,13 @@ class Quat:
                 q = np.tile(q, (p.shape[0], 1))
             if p.shape[0] == 1 and q.shape[0] > 1:
                 p = np.tile(p, (q.shape[0], 1))
-            assert q.shape[1] == p.shape[1] == 4, f"Both quaternions have to have 4 elements, got {q.shape[1]} and {p.shape[1]}"
+            if (q.shape[1] != 4) or (p.shape[1] != 4):
+                raise ValueError(f"Both quaternions have to have 4 elements, got {q.shape[1]} and {p.shape[1]}")
 
             return q, q_single, p, p_single
         else:
-            assert q.shape[1] == 4, f"Quaternion has to have 4 elements, got {q.shape[1]}"
+            if q.shape[1] != 4:
+                raise ValueError(f"Quaternion has to have 4 elements, got {q.shape[1]}")
             return q, q_single
 
 
@@ -498,7 +616,12 @@ class Quat:
             np.ndarray:
                 The Hamilton product q * p
         """
+        if not isinstance(q, Quat) and not isinstance(q, np.ndarray):
+            raise TypeError(f"Expected q to be of type Quat or np.ndarray, got {type(q)}")
+        if not isinstance(p, Quat) and not isinstance(p, np.ndarray):
+            raise TypeError(f"Expected p to be of type Quat or np.ndarray, got {type(p)}")
         q, q_single, p, p_single = Quat._convert_and_align(q, p)
+        # @see https://en.wikipedia.org/wiki/Quaternion#:~:text=of%20vector%20quaternions.-,Hamilton%20product,-%5Bedit%5D
         qa = q[:, 0].reshape(-1, 1)
         qb = q[:, 1].reshape(-1, 1)
         qc = q[:, 2].reshape(-1, 1)

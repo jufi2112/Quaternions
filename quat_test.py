@@ -670,12 +670,249 @@ class TestQuat(unittest.TestCase):
     #########################################
 
     def test_static_hamilton_product(self):
-        print("\n\n!!!Unit test for static Hamilton Product not implemented!!!\n\n")
-        pass
+        q = Quat(np.random.rand(4) - 0.5)
+        p = Quat(np.random.rand(4) - 0.5)
+        a1, b1, c1, d1 = q.numpy()
+        a2, b2, c2, d2 = p.numpy()
+        # @see https://en.wikipedia.org/wiki/Quaternion
+        res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+        res = Quat.hamilton_product(q, p)
+        self.assertTrue(np.isclose(res, res_gt.numpy()).all())
+        p = np.random.rand(10, 4) - 0.5
+        res = Quat.hamilton_product(q, p)
+        for i, x in enumerate(p):
+            a2, b2, c2, d2 = x
+            res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+            self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
+        q = np.random.rand(10, 4) - 0.5
+        p = np.random.rand(4) - 0.5
+        a2, b2, c2, d2 = p
+        res = Quat.hamilton_product(q, p)
+        for i, x in enumerate(q):
+            a1, b1, c1, d1 = x
+            res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+            self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
+        q = np.random.rand(10, 4) - 0.5
+        p = np.random.rand(10, 4) - 0.5
+        res = Quat.hamilton_product(q, p)
+        for i, _ in enumerate(q):
+            a1, b1, c1, d1 = q[i]
+            a2, b2, c2, d2 = p[i]
+            res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+            self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        q = np.random.rand(5, 4)
+        p = np.random.rand(2, 4)
+        o = np.random.rand(3, 5)
+        n = np.random.rand(3)
+        with self.assertRaises(TypeError):
+            Quat.hamilton_product(q, s_int)
+        with self.assertRaises(TypeError):
+            Quat.hamilton_product(q, s_float)
+        with self.assertRaises(ValueError):
+            Quat.hamilton_product(q, o)
+        with self.assertRaises(ValueError):
+            Quat.hamilton_product(n, n)
 
 
     def test_operator_matmul(self):
-        
+        q = Quat(np.random.rand(4) - 0.5)
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(10, 4) - 0.5
+
+        res = q @ p
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, p)).all())
+        res = q @ o
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, o)).all())
+        res = q @ n
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), Quat.hamilton_product(q, n[i])).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        arr_single_invalid = np.random.rand(1) - 0.5
+        arr_multi_invalid = np.random.rand(10, 1) - 0.5
+        with self.assertRaises(TypeError):
+            q @ s_int
+        with self.assertRaises(TypeError):
+            q @ s_float
+        with self.assertRaises(ValueError):
+            q @ arr_single_invalid
+        with self.assertRaises(ValueError):
+            q @ arr_multi_invalid
+
+
+    def test_operator_reverse_matmul(self):
+        q = Quat(np.random.rand(4) - 0.5)
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(10, 4) - 0.5
+
+        res = p @ q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(p, q)).all())
+        res = o @ q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(o, q)).all())
+        res = n @ q
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), Quat.hamilton_product(n[i], q)).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        arr_single_invalid = np.random.rand(1) - 0.5
+        arr_multi_invalid = np.random.rand(10, 1) - 0.5
+        with self.assertRaises(TypeError):
+            s_int @ q
+        with self.assertRaises(TypeError):
+            s_float @ q
+        with self.assertRaises(ValueError):
+            arr_single_invalid @ q
+        with self.assertRaises(ValueError):
+            arr_multi_invalid @ q
+
+
+    def test_operator_inplace_matmul(self):
+        a = np.random.rand(4) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(1, 4) - 0.5
+
+        # Quat *= Quat
+        q = Quat(a)
+        q @= p
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, p)).all())
+        q = Quat(a)
+        q @= o
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, o)).all())
+        q = Quat(a)
+        q @= n
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, n)).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        arr_single_invalid = np.random.rand(1) - 0.5
+        arr_multi_invalid = np.random.rand(10, 1) - 0.5
+        multi_quat = np.random.rand(10, 4) - 0.5
+        q = Quat(a)
+        with self.assertRaises(TypeError):
+            q @= s_int
+        with self.assertRaises(TypeError):
+            q @= s_float
+        with self.assertRaises(ValueError):
+            q @= arr_single_invalid
+        with self.assertRaises(ValueError):
+            q @= arr_multi_invalid
+        with self.assertRaises(ValueError):
+            q @= multi_quat
+
+
+    def test_member_hamilton(self):
+        q = Quat(np.random.rand(4) - 0.5)
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(10, 4) - 0.5
+
+        res = q.hamilton_product(p)
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, p)).all())
+        res = q.hamilton_product(o)
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, o)).all())
+        res = q.hamilton_product(n)
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), Quat.hamilton_product(q, n[i])).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        arr_single_invalid = np.random.rand(1) - 0.5
+        arr_multi_invalid = np.random.rand(10, 1) - 0.5
+        with self.assertRaises(TypeError):
+            q.hamilton_product(s_int)
+        with self.assertRaises(TypeError):
+            q.hamilton_product(s_float)
+        with self.assertRaises(ValueError):
+            q.hamilton_product(arr_single_invalid)
+        with self.assertRaises(ValueError):
+            q.hamilton_product(arr_multi_invalid)
+
+
+    def test_member_inplace_hamilton(self):
+        a = np.random.rand(4) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(1, 4) - 0.5
+
+        # Quat *= Quat
+        q = Quat(a)
+        q.hamilton_product_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, p)).all())
+        q = Quat(a)
+        q.hamilton_product_(o)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, o)).all())
+        q = Quat(a)
+        q.hamilton_product_(n)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, n)).all())
+
+        # Test invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        arr_single_invalid = np.random.rand(1) - 0.5
+        arr_multi_invalid = np.random.rand(10, 1) - 0.5
+        multi_quat = np.random.rand(10, 4) - 0.5
+        q = Quat(a)
+        with self.assertRaises(TypeError):
+            q.hamilton_product_(s_int)
+        with self.assertRaises(TypeError):
+            q.hamilton_product_(s_float)
+        with self.assertRaises(ValueError):
+            q.hamilton_product_(arr_single_invalid)
+        with self.assertRaises(ValueError):
+            q.hamilton_product_(arr_multi_invalid)
+        with self.assertRaises(ValueError):
+            q.hamilton_product_(multi_quat)
+
+    #######################################
+    #   End Testing of Hamilton Product   #
+    #######################################
 
 
     def test_static_norm(self):
