@@ -4,7 +4,6 @@
     - [] conjugate_p_by_Q
     - [] rotate
     - [] create from vector representation
-    - [] pow
     - [] reciprocal
 
 """
@@ -49,6 +48,7 @@ class Quat:
         self.conjugate = self._instance_conjugate
         self.scalar_multiply = self._instance_scalar_multiply
         self.hamilton_product = self._instance_hamilton_product
+        self.pow = self._instance_pow
 
 
     def __str__(self):
@@ -57,6 +57,10 @@ class Quat:
 
     def __repr__(self):
         return f"Quat({self.quat_[0]}, {self.quat_[1]}, {self.quat_[2]}, {self.quat_[3]})"
+
+
+    def __neg__(self):
+        return Quat(self.quat_ * -1)
 
 
     def __array_ufunc__(self, ufunc, method, *args, **kwargs):
@@ -263,6 +267,11 @@ class Quat:
         return NotImplemented
 
 
+    def __pow__(self, power: int) -> Quat:
+        if isinstance(power, int):
+            return Quat(Quat.pow(self, power))
+        return NotImplemented
+
     def numpy(self) -> np.ndarray:
         """
             Returns the quaternion representation q = a + bi + cj + dk
@@ -325,6 +334,13 @@ class Quat:
             Returns the vector part of the quaternion
         """
         return self.quat_[1:]
+
+
+    def copy(self) -> Quat:
+        """
+            Returns a copy of this quaternion.
+        """
+        return Quat(np.copy(self.quat_))
 
 
     def _instance_norm(self) -> float:
@@ -441,8 +457,25 @@ class Quat:
         return np.asarray([Quat(elem) for elem in res])
 
 
+    def _instance_pow(self, power: int) -> Quat:
+        """
+            Calculates q ^ power. Equivalent to self ** power
 
-    def normalize_(self):
+        Params
+        ------
+            power: int
+                Power > 0
+
+        Returns
+        -------
+            Quat:
+                q ^ power
+        """
+        return self ** power
+
+
+
+    def normalize_(self) -> Quat:
         """
             Normalizes this quaternion.
         """
@@ -486,7 +519,7 @@ class Quat:
         return self
 
 
-    def conjugate_(self):
+    def conjugate_(self) -> Quat:
         """
             Replace this quaternion by its conjugate.
         """
@@ -494,7 +527,7 @@ class Quat:
         return self
 
 
-    def scalar_multiply_(self, other: Union[int, float, np.ndarray]):
+    def scalar_multiply_(self, other: Union[int, float, np.ndarray]) -> Quat:
         """
             Replace this quaternion q by scalar multiplication with scalar s:
             q * s = s * q = sa + sbi + scj + sdk
@@ -508,7 +541,7 @@ class Quat:
         return self
 
 
-    def hamilton_product_(self, other: Union[Quat, np.ndarray]):
+    def hamilton_product_(self, other: Union[Quat, np.ndarray]) -> Quat:
         """
             Replaces this quaternion q by q @ other.
         """
@@ -520,6 +553,14 @@ class Quat:
             if other.ndim == 2:
                 other = other[0]
         self.quat_ = Quat.hamilton_product(self, other)
+        return self
+
+
+    def pow_(self, power: int) -> Quat:
+        """
+            Replaces this quaternion q by q ^ power
+        """
+        self.quat_ = Quat.pow(self, power)
         return self
 
 
@@ -765,3 +806,35 @@ class Quat:
             if q.ndim > 1 and s.ndim > 1 and s.shape[0] != 1 and q.shape[0] != s.shape[0]:
                 raise ValueError(f"Cannot multiply {s.shape[0]} scalars to {q.shape[0]} quaternions.")
             return q * s
+
+
+    @staticmethod
+    def pow(q: Union[Quat, np.ndarray], power: int) -> np.ndarray:
+        """
+            Calculates q^power
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                The quaternion for which the power should be calculated. If
+                the power of multiple quaternions should be calculated, provide
+                a numpy array of shape (N, 4)
+            power (int):
+                The power
+
+        Returns
+        -------
+            np.ndarray:
+                q^power. If q is batched, the returned array is also of shape (N, 4)
+        """
+        if not isinstance(q, Quat) and not isinstance(q, np.ndarray):
+            raise TypeError(f"Expected parameter q to be of type Quat or np.ndarray, got {type(q)}")
+        if not isinstance(power, int):
+            raise TypeError(f"Expected parameter power to be of type int, got {type(power)}")
+        if power <= 0:
+            raise ValueError(f"Argument power has to be greater than 0")
+        res = np.copy(q) if isinstance(q, np.ndarray) else np.copy(q.numpy())
+        while (power > 1):
+            res = Quat.hamilton_product(res, q)
+            power -= 1
+        return res

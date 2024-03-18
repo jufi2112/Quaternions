@@ -27,6 +27,15 @@ class TestQuat(unittest.TestCase):
         b = Quat(a)
         self.assertEqual(str(b), f"Quaternion {a[0]} + {a[1]}i + {a[2]}j + {a[3]}k")
 
+
+    def test_neg(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        q_neg = -q
+        self.assertIsInstance(q_neg, Quat)
+        self.assertTrue(np.isclose(q_neg.numpy(), a * -1).all())
+
+
     #################################
     #   Start Testing of Addition   #
     #################################
@@ -913,6 +922,126 @@ class TestQuat(unittest.TestCase):
     #######################################
     #   End Testing of Hamilton Product   #
     #######################################
+
+
+    ############################
+    #   Start Testing of Pow   #
+    ############################
+
+    def test_static_pow(self):
+        for _ in range(10):
+            a = np.random.rand(4) - 0.5
+            q = Quat(a)
+            power = np.random.randint(1, 20)
+            res = Quat.pow(q, power)
+            res_gt = np.copy(a)
+            while power > 1:
+                res_gt = Quat.hamilton_product(res_gt, a)
+                power -= 1
+            self.assertTrue(np.isclose(res, res_gt).all())
+        for _ in range(10):
+            a = np.random.rand(10, 4) - 0.5
+            power = np.random.randint(1, 20)
+            res = Quat.pow(a, power)
+            for i, x in enumerate(a):
+                res_gt = np.copy(x)
+                power_iter = power
+                while power_iter > 1:
+                    res_gt = Quat.hamilton_product(res_gt, x)
+                    power_iter -= 1
+                self.assertTrue(np.isclose(res[i], res_gt).all())
+
+        # Test invalid parameters
+        q = Quat()
+        with self.assertRaises(TypeError):
+            Quat.pow(q, 2.3)
+        with self.assertRaises(TypeError):
+            Quat.pow(q, 2.0)
+        with self.assertRaises(ValueError):
+            Quat.pow(q, -1)
+        with self.assertRaises(ValueError):
+            Quat.pow(q, 0)
+        with self.assertRaises(TypeError):
+            Quat.pow(3, q)
+
+
+    def test_operator_pow(self):
+        for _ in range(10):
+            a = np.random.rand(4) - 0.5
+            q = Quat(a)
+            power = np.random.randint(1, 20)
+            res = q ** power
+            self.assertIsInstance(res, Quat)
+            res_gt = np.copy(a)
+            while power > 1:
+                res_gt = Quat.hamilton_product(res_gt, a)
+                power -= 1
+            self.assertTrue(np.isclose(res.numpy(), res_gt).all())
+
+        # Test invalid parameters
+        q = Quat()
+        with self.assertRaises(TypeError):
+            q ** 2.3
+        with self.assertRaises(TypeError):
+            q ** 2.0
+        with self.assertRaises(ValueError):
+            q ** -1
+        with self.assertRaises(ValueError):
+           q ** 0
+
+
+    def test_member_pow(self):
+        for _ in range(10):
+            a = np.random.rand(4) - 0.5
+            q = Quat(a)
+            power = np.random.randint(1, 20)
+            res = q.pow(power)
+            self.assertIsInstance(res, Quat)
+            res_gt = np.copy(a)
+            while power > 1:
+                res_gt = Quat.hamilton_product(res_gt, a)
+                power -= 1
+            self.assertTrue(np.isclose(res.numpy(), res_gt).all())
+
+        # Test invalid parameters
+        q = Quat()
+        with self.assertRaises(TypeError):
+            q.pow(2.3)
+        with self.assertRaises(TypeError):
+            q.pow(2.0)
+        with self.assertRaises(ValueError):
+            q.pow(-1)
+        with self.assertRaises(ValueError):
+           q.pow(0)
+
+
+    def test_member_inplace_pow(self):
+        for _ in range(10):
+            a = np.random.rand(4) - 0.5
+            q = Quat(a)
+            power = np.random.randint(1, 20)
+            q.pow_(power)
+            self.assertIsInstance(q, Quat)
+            res_gt = np.copy(a)
+            while power > 1:
+                res_gt = Quat.hamilton_product(res_gt, a)
+                power -= 1
+            self.assertTrue(np.isclose(q.numpy(), res_gt).all())
+
+        # Test invalid parameters
+        q = Quat()
+        with self.assertRaises(TypeError):
+            q.pow_(2.3)
+        with self.assertRaises(TypeError):
+            q.pow_(2.0)
+        with self.assertRaises(ValueError):
+            q.pow_(-1)
+        with self.assertRaises(ValueError):
+           q.pow_(0)
+
+    ##########################
+    #   End Testing of Pow   #
+    ##########################
 
 
     def test_static_norm(self):
