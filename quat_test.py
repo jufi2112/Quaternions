@@ -950,6 +950,9 @@ class TestQuat(unittest.TestCase):
                     res_gt = Quat.hamilton_product(res_gt, x)
                     power_iter -= 1
                 self.assertTrue(np.isclose(res[i], res_gt).all())
+        q = Quat(np.random.rand(4) - 0.5)
+        res = Quat.pow(q, 0)
+        self.assertTrue(np.isclose(res, np.asarray([1,0,0,0])).all())
 
         # Test invalid parameters
         q = Quat()
@@ -959,8 +962,6 @@ class TestQuat(unittest.TestCase):
             Quat.pow(q, 2.0)
         with self.assertRaises(ValueError):
             Quat.pow(q, -1)
-        with self.assertRaises(ValueError):
-            Quat.pow(q, 0)
         with self.assertRaises(TypeError):
             Quat.pow(3, q)
 
@@ -977,6 +978,9 @@ class TestQuat(unittest.TestCase):
                 res_gt = Quat.hamilton_product(res_gt, a)
                 power -= 1
             self.assertTrue(np.isclose(res.numpy(), res_gt).all())
+        q = Quat(np.random.rand(4) - 0.5)
+        res = q ** 0
+        self.assertTrue(np.isclose(res.numpy(), np.asarray([1,0,0,0])).all())
 
         # Test invalid parameters
         q = Quat()
@@ -986,8 +990,6 @@ class TestQuat(unittest.TestCase):
             q ** 2.0
         with self.assertRaises(ValueError):
             q ** -1
-        with self.assertRaises(ValueError):
-           q ** 0
 
 
     def test_member_pow(self):
@@ -1002,6 +1004,9 @@ class TestQuat(unittest.TestCase):
                 res_gt = Quat.hamilton_product(res_gt, a)
                 power -= 1
             self.assertTrue(np.isclose(res.numpy(), res_gt).all())
+        q = Quat(np.random.rand(4) - 0.5)
+        res = q.pow(0)
+        self.assertTrue(np.isclose(res.numpy(), np.asarray([1,0,0,0])).all())
 
         # Test invalid parameters
         q = Quat()
@@ -1011,8 +1016,6 @@ class TestQuat(unittest.TestCase):
             q.pow(2.0)
         with self.assertRaises(ValueError):
             q.pow(-1)
-        with self.assertRaises(ValueError):
-           q.pow(0)
 
 
     def test_member_inplace_pow(self):
@@ -1028,6 +1031,11 @@ class TestQuat(unittest.TestCase):
                 power -= 1
             self.assertTrue(np.isclose(q.numpy(), res_gt).all())
 
+        q = Quat(np.random.rand(4) - 0.5)
+        q.pow_(0)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), np.asarray([1,0,0,0])).all())
+
         # Test invalid parameters
         q = Quat()
         with self.assertRaises(TypeError):
@@ -1036,12 +1044,64 @@ class TestQuat(unittest.TestCase):
             q.pow_(2.0)
         with self.assertRaises(ValueError):
             q.pow_(-1)
-        with self.assertRaises(ValueError):
-           q.pow_(0)
 
     ##########################
     #   End Testing of Pow   #
     ##########################
+
+
+    ###################################
+    #   Start Testing of Reciprocal   #
+    ###################################
+
+    def test_static_reciprocal(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        q_rec = Quat.reciprocal(q)
+        self.assertTrue(np.isclose(Quat.hamilton_product(q_rec, q), np.asarray([1,0,0,0])).all())
+        self.assertTrue(np.isclose(Quat.hamilton_product(q, q_rec), np.asarray([1,0,0,0])).all())
+        q = np.random.rand(10, 4) - 0.5
+        q_rec = Quat.reciprocal(q)
+        res = Quat.hamilton_product(q_rec, q)
+        for x in res:
+            self.assertTrue(np.isclose(x, np.asarray([1,0,0,0])).all())
+        res = Quat.hamilton_product(q, q_rec)
+        for x in res:
+            self.assertTrue(np.isclose(x, np.asarray([1,0,0,0])).all())
+
+        # Invalid values
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        with self.assertRaises(TypeError):
+            Quat.reciprocal(s_int)
+        with self.assertRaises(TypeError):
+            Quat.reciprocal(s_float)
+        with self.assertRaises(ValueError):
+            Quat.reciprocal(np.random.rand(6) - 0.5)
+        with self.assertRaises(ValueError):
+            Quat.reciprocal(np.random.rand(3, 6) - 0.5)
+
+
+    def test_member_reciprocal(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        rec = q.reciprocal()
+        self.assertIsInstance(rec, Quat)
+        self.assertTrue(np.isclose(Quat.hamilton_product(q, rec), np.asarray([1,0,0,0])).all())
+        self.assertTrue(np.isclose(Quat.hamilton_product(rec, q), np.asarray([1,0,0,0])).all())
+
+
+    def test_member_inplace_reciprocal(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        q.reciprocal_()
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(Quat.hamilton_product(q, a), np.asarray([1,0,0,0])).all())
+        self.assertTrue(np.isclose(Quat.hamilton_product(a, q), np.asarray([1,0,0,0])).all())
+
+    #################################
+    #   End Testing of Reciprocal   #
+    #################################
 
 
     def test_static_norm(self):

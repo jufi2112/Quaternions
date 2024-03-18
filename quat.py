@@ -4,7 +4,7 @@
     - [] conjugate_p_by_Q
     - [] rotate
     - [] create from vector representation
-    - [] reciprocal
+    - [] div
 
 """
 
@@ -49,6 +49,7 @@ class Quat:
         self.scalar_multiply = self._instance_scalar_multiply
         self.hamilton_product = self._instance_hamilton_product
         self.pow = self._instance_pow
+        self.reciprocal = self._instance_reciprocal
 
 
     def __str__(self):
@@ -202,6 +203,30 @@ class Quat:
             else:
                 raise ValueError(f"Expected scalar array to have shape (1) or (1, 1), got {other.shape}")
         return NotImplemented
+
+
+    # Div is: q @ x = m --> x = q^-1 @ m
+    # def __truediv__(self, other: Union[np.ndarray, int, float]) -> Quat:
+    #     """
+    #         Scalar division of q by other, equivalent to q * 1/other
+    #     """
+    #     if isinstance(other, int) or isinstance(other, float):
+    #         if other == 0:
+    #             raise ZeroDivisionError("Parameter other is zero!")
+    #         return self * (1/other)
+    #     if isinstance(other, np.ndarray):
+    #         if other.ndim == 1:
+    #             if len(other) == 1:
+    #                 return self * (1/other)
+    #             else:
+    #                 raise ValueError(f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
+    #         elif other.ndim == 2:
+    #             if other.shape[1] == 1:
+    #                 return self * (1/other)
+    #             else:
+    #                 raise ValueError(f"Expected batched scalar array to have shape (N, 1), got {other.shape}")
+
+    #     return NotImplemented
 
 
     def __matmul__(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
@@ -474,6 +499,19 @@ class Quat:
         return self ** power
 
 
+    def _instance_reciprocal(self) -> Quat:
+        """
+            Calculates the reciprocal q^-1 of this quaternion q such that
+            q * q^-1 = q^-1 * q = (1 + 0i + 0j + 0k)
+
+        Returns
+        -------
+            Quat:
+                q^-1
+        """
+        return self.conjugate() * (1/(self.norm() ** 2))
+
+
 
     def normalize_(self) -> Quat:
         """
@@ -561,6 +599,14 @@ class Quat:
             Replaces this quaternion q by q ^ power
         """
         self.quat_ = Quat.pow(self, power)
+        return self
+
+
+    def reciprocal_(self) -> Quat:
+        """
+            Replaces this quaternion q by its reciprocal q^-1
+        """
+        self.quat_ = Quat.reciprocal(self)
         return self
 
 
@@ -831,10 +877,46 @@ class Quat:
             raise TypeError(f"Expected parameter q to be of type Quat or np.ndarray, got {type(q)}")
         if not isinstance(power, int):
             raise TypeError(f"Expected parameter power to be of type int, got {type(power)}")
-        if power <= 0:
-            raise ValueError(f"Argument power has to be greater than 0")
+        if power < 0:
+            raise ValueError(f"Argument power has to be non-negative")
+        if power == 0:
+            if isinstance(q, Quat):
+                return np.asarray([1,0,0,0])
+            if q.ndim == 1:
+                return np.asarray([1,0,0,0])
+            elif q.ndim == 2:
+                return np.tile(np.asarray([1,0,0,0]), (len(q), 1))
+            else:
+                raise ValueError(f"Expected quaternion q to have shape (4) or (N, 4), got {q.shape}")
         res = np.copy(q) if isinstance(q, np.ndarray) else np.copy(q.numpy())
         while (power > 1):
             res = Quat.hamilton_product(res, q)
             power -= 1
         return res
+
+
+    @staticmethod
+    def reciprocal(q: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Calculates the multiplicative inverse (reciprocal) q^-1 of given quaternion
+            q such that q * q^-1 = q^-1 * q = 1
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                The (possibly batched) quaternion for which the reciprocal should
+                be calculated. Shape of (4) or (N, 4).
+
+        Returns
+        -------
+            np.ndarray:
+                q^-1 of shape (4) or (N, 4)
+        """
+        if not isinstance(q, Quat) and not isinstance(q, np.ndarray):
+            raise TypeError(f"Expected parameter q to be of type Quat or np.ndarray, got {type(q)}")
+        if isinstance(q, np.ndarray):
+            if (q.ndim == 1 and len(q) != 4) or (q.ndim == 2 and q.shape[1] != 4) or (q.ndim not in [1,2]):
+                raise ValueError(f"Expected quaternion to be of shape (4) or (N, 4), got {q.shape}")
+        q_conj = Quat.conjugate(q)
+        q_norm_squared = Quat.norm(q) ** 2
+        return q_conj * (1/q_norm_squared)
