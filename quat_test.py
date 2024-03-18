@@ -350,15 +350,16 @@ class TestQuat(unittest.TestCase):
     ##################################
 
 
-    #################################
-    #   Start Testing of Multiply   #
-    #################################
+    ########################################
+    #   Start Testing of Scalar Multiply   #
+    ########################################
 
     def test_static_scalar_multiply(self):
         q_single = Quat(np.random.rand(4) - 0.5)
         q_multi = np.random.rand(10, 4) - 0.5
         s_single_int = np.random.randint(-10, 10)
         s_single_float = np.random.rand(1)[0] - 0.5
+
         # Single / multi quaternion times single scalar as int or float
         res = Quat.scalar_multiply(q_single, s_single_int)
         self.assertTrue(np.isclose(res, q_single.numpy() * s_single_int).all())
@@ -372,6 +373,7 @@ class TestQuat(unittest.TestCase):
         res = Quat.scalar_multiply(q_multi, s_single_float)
         self.assertTrue(np.isclose(res, q_multi*s_single_float).all())
         self.assertTrue(res.ndim == 2)
+
         # Single / multi quaternion times single / multi scalar as np array
         s_single_arr_onedim = np.random.rand(1) - 0.5
         s_single_arr_multidim = np.random.rand(1, 1) - 0.5
@@ -398,10 +400,283 @@ class TestQuat(unittest.TestCase):
         self.assertRaises(ValueError, Quat.scalar_multiply, q_multi_wrong_dim, s_multi_arr)
         self.assertRaises(ValueError, Quat.scalar_multiply, np.asarray(5), 1)
         self.assertRaises(ValueError, Quat.scalar_multiply, np.random.rand(2, 5), 1)
+        self.assertRaises(ValueError, Quat.scalar_multiply, q_single, np.random.rand(4))
 
-    ###############################
-    #   End Testing of Multiply   #
-    ###############################
+
+    def test_operator_multiply(self):
+        q = Quat(np.random.rand(4) - 0.5)
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(10, 4) - 0.5
+
+        # Quat * scalars
+        res = q * s_int
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_int).all())
+        res = q * s_float
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_float).all())
+        res = q * s_arr_onedim_single
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_arr_onedim_single).all())
+        res = q * s_arr_twodim_single
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(len(res) == s_arr_twodim_single.shape[0])
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), q.numpy() * s_arr_twodim_single[i]).all())
+        res = q * s_arr_twodim_multi
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(len(res) == s_arr_twodim_multi.shape[0])
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), q.numpy() * s_arr_twodim_multi[i]).all())
+
+        # Quat * Quat should not be supported by scalar multiplication *
+        with self.assertRaises(TypeError):
+            q * p
+        with self.assertRaises(ValueError):
+            q * o
+        with self.assertRaises(ValueError):
+            q * n
+        with self.assertRaises(ValueError):
+            q * (np.random.rand(5) - 0.5)
+
+        # res = q * p
+        # self.assertIsInstance(res, Quat)
+        # self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, p)).all())
+        # res = q * o
+        # self.assertIsInstance(res, Quat)
+        # self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(q, o)).all())
+        # res = q * n
+        # self.assertIsInstance(res, np.ndarray)
+        # self.assertTrue(len(res) == n.shape[0])
+        # for i, x in enumerate(res):
+        #     self.assertIsInstance(x, Quat)
+        #     self.assertTrue(np.isclose(x.numpy(), Quat.hamilton_product(q.numpy(), n[i])).all())
+
+        # Check errors are raised for invalid input
+        with self.assertRaises(ValueError):
+            q * (np.random.rand(2) - 0.5)
+        with self.assertRaises(ValueError):
+            q * (np.random.rand(6) - 0.5)
+        with self.assertRaises(ValueError):
+            q * (np.random.rand(10, 2) - 0.5)
+
+
+    def test_operator_reverse_multiply(self):
+        q = Quat(np.random.rand(4) - 0.5)
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(10, 4) - 0.5
+
+        # Quat * scalars
+        res = s_int * q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_int).all())
+        res = s_float * q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_float).all())
+        res = s_arr_onedim_single * q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), q.numpy() * s_arr_onedim_single).all())
+        res = s_arr_twodim_single * q
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(len(res) == s_arr_twodim_single.shape[0])
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), q.numpy() * s_arr_twodim_single[i]).all())
+        res = s_arr_twodim_multi * q
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(len(res) == s_arr_twodim_multi.shape[0])
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), q.numpy() * s_arr_twodim_multi[i]).all())
+
+        # Quat * Quat should not be supported for scalar multiply *
+        with self.assertRaises(ValueError):
+            o * q
+        with self.assertRaises(ValueError):
+            n * q
+
+        # res = o * q
+        # self.assertIsInstance(res, Quat)
+        # self.assertTrue(np.isclose(res.numpy(), Quat.hamilton_product(o, q)).all())
+        # res = n * q
+        # self.assertIsInstance(res, np.ndarray)
+        # self.assertTrue(len(res) == n.shape[0])
+        # for i, x in enumerate(res):
+        #     self.assertIsInstance(x, Quat)
+        #     self.assertTrue(np.isclose(x.numpy(), Quat.hamilton_product(n[i], q.numpy())).all())
+
+        # Check errors are raised for invalid input
+        with self.assertRaises(ValueError):
+            (np.random.rand(2) - 0.5) * q
+        with self.assertRaises(ValueError):
+            (np.random.rand(6) - 0.5) * q
+        with self.assertRaises(ValueError):
+            (np.random.rand(10, 2) - 0.5) * q
+
+
+    def test_operator_inplace_multiply(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(1, 4) - 0.5
+
+        # Quat *= scalars
+        q *= s_int
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_int).all())
+        q = Quat(a)
+        q *= s_float
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_float).all())
+        q = Quat(a)
+        q *= s_arr_onedim_single
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_arr_onedim_single).all())
+        q = Quat(a)
+        q *= s_arr_twodim_single
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_arr_twodim_single).all())
+
+        # Quat *= Quat should not be supported by scalar multiply *
+        q = Quat(a)
+        with self.assertRaises(TypeError):
+            q *= p
+        with self.assertRaises(ValueError):
+            q *= o
+        with self.assertRaises(ValueError):
+            q *= n
+        with self.assertRaises(ValueError):
+            q *= (np.random.rand(5) - 0.5)
+
+        # q = Quat(a)
+        # q *= p
+        # self.assertIsInstance(q, Quat)
+        # self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, p)).all())
+        # q = Quat(a)
+        # q *= o
+        # self.assertIsInstance(q, Quat)
+        # self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, o)).all())
+        # q = Quat(a)
+        # q *= n
+        # self.assertIsInstance(q, Quat)
+        # self.assertTrue(np.isclose(q.numpy(), Quat.hamilton_product(a, n)).all())
+
+
+    def test_member_scalar_multiply(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(1, 4) - 0.5
+
+        # Quat *= scalars
+        res = q.scalar_multiply(s_int)
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), a * s_int).all())
+        res = q.scalar_multiply(s_float)
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), a * s_float).all())
+        res = q.scalar_multiply(s_arr_onedim_single)
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), a * s_arr_onedim_single).all())
+        res = q.scalar_multiply(s_arr_twodim_single)
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), a * s_arr_twodim_single[i]).all())
+
+        # Quat *= Quat should not be supported by scalar multiply *
+        with self.assertRaises(TypeError):
+            q.scalar_multiply(p)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply(o)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply(n)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply((np.random.rand(5) - 0.5))
+
+
+    def test_member_scalar_multiply_inplace(self):
+        a = np.random.rand(4) - 0.5
+        s_int = np.random.randint(-10, 10)
+        s_float = np.random.rand(1)[0] - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        p = Quat(np.random.rand(4) - 0.5)
+        o = np.random.rand(4) - 0.5
+        n = np.random.rand(1, 4) - 0.5
+        m = np.random.rand(6) - 0.5
+        l = np.random.rand(1, 6) - 0.5
+
+        # Quat * Scalar
+        q = Quat(a)
+        q.scalar_multiply_(s_int)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_int).all())
+        q = Quat(a)
+        q.scalar_multiply_(s_float)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_float).all())
+        q = Quat(a)
+        q.scalar_multiply_(s_arr_onedim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_arr_onedim_single).all())
+        q = Quat(a)
+        q.scalar_multiply_(s_arr_twodim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), a * s_arr_twodim_single).all())
+
+        # Quat * Quat not supported
+        with self.assertRaises(TypeError):
+            q.scalar_multiply_(p)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply_(o)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply_(n)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply_(m)
+        with self.assertRaises(ValueError):
+            q.scalar_multiply_(l)
+
+    ######################################
+    #   End Testing of Scalar Multiply   #
+    ######################################
+
+
+    #########################################
+    #   Start Testing of Hamilton Product   #
+    #########################################
+
+    def test_static_hamilton_product(self):
+        print("\n\n!!!Unit test for static Hamilton Product not implemented!!!\n\n")
+        pass
+
+
+    def test_operator_matmul(self):
+        
+
 
     def test_static_norm(self):
         a = np.random.rand(4) - 0.5

@@ -48,6 +48,7 @@ class Quat:
         self.add = self._instance_add
         self.sub = self._instance_sub
         self.conjugate = self._instance_conjugate
+        self.scalar_multiply = self._instance_scalar_multiply
 
 
     def __str__(self):
@@ -63,6 +64,15 @@ class Quat:
             x = args[0]
             y = args[1]
             if isinstance(x, np.ndarray) and isinstance(y, Quat):
+                if ufunc is np.add:
+                    return y.__radd__(x)
+                if ufunc is np.subtract:
+                    return y.__rsub__(x)
+                if ufunc is np.multiply:
+                    return y.__rmul__(x)
+                if ufunc is np.matmul:
+                    return y.__rmatmul__(x)
+            if isinstance(x, np.float64) and isinstance(y, Quat):
                 if ufunc is np.add:
                     return y.__radd__(x)
                 if ufunc is np.subtract:
@@ -125,27 +135,67 @@ class Quat:
         return self
 
 
-    # TODO: not finished
-    def __mul__(self, other: Union[Quat, np.ndarray, float, int]):
+    def __mul__(self, other: Union[np.ndarray, float, int]) -> Union[Quat, np.ndarray]:
+        """
+            Scalar multiplication of quaternion q with scalar s: q*s = s*q =
+            sa + sbi + scj + sdk
+        """
         if isinstance(other, int) or isinstance(other, float):
-            return Quat(self.quat_ * other)
+            return Quat(Quat.scalar_multiply(self, other))
         if isinstance(other, Quat):
+            return NotImplemented
             return Quat(Quat.hamilton_product(self, other))
         if isinstance(other, np.ndarray):
             if other.ndim == 1:
-                if len(other) == 4:
-                    return Quat(Quat.hamilton_product(self, other))
+                if len(other) == 1:
+                    return Quat(Quat.scalar_multiply(self, other))
                 else:
-                    raise ValueError("If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
+                    raise ValueError(f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
             if other.ndim == 2:
                 if other.shape[1] == 1:
-                    return np.asarray([Quat()])
-                if other.shape[1] == 4:
-                    res = Quat.hamilton_product(self, other)
+                    res = Quat.scalar_multiply(self, other)
                     return np.asarray([Quat(elem) for elem in res])
-            raise ValueError(f"Shape of provided numpy array not supported, expected (4), (N, 4) or (N, 1), got {other.shape}")
+                else:
+                    raise ValueError(f"Expected batched scalar array to have shape (N, 1), got {other.shape}")
+            else:
+                raise ValueError(f"Shape of provided numpy array not supported, expected (1) or (N, 1), got {other.shape}")
         return NotImplemented
 
+
+    def __rmul__(self, other: Union[float, int, np.ndarray]) -> Union[Quat, np.ndarray]:
+        if isinstance(other, int) or isinstance(other, float):
+            return self * other
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1:
+                if len(other) == 1:
+                    return self * other
+                else:
+                    raise ValueError(f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
+            if other.ndim == 2:
+                if other.shape[1] == 1:
+                    res = Quat.scalar_multiply(self, other)
+                    return np.asarray([Quat(elem) for elem in res])
+                else:
+                    raise ValueError(f"Expected batched scalar array to have shape (N, 1), got {other.shape}")
+            else:
+                raise ValueError(f"Shape of provided numpy array not supported, expected (1) or (N, 1), got {other.shape}")
+        return NotImplemented
+
+
+    def __imul__(self, other: Union[float, int, np.ndarray]) -> Quat:
+        if isinstance(other, int) or isinstance(other, float):
+            self = self * other
+            return self
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1:
+                self = self * other
+                return self
+            elif other.ndim == 2 and other.shape[0] == 1:
+                self = (self * other)[0]
+                return self
+            else:
+                raise ValueError(f"Expected scalar array to have shape (1) or (1, 1), got {other.shape}")
+        return NotImplemented
 
 
     def numpy(self) -> np.ndarray:
@@ -240,7 +290,8 @@ class Quat:
 
         Returns
         -------
-            Quat or np.ndarray: The result. If other is batched, returns an array of Quats
+            Quat or np.ndarray:
+                The result. If other is batched, returns an array of Quats
                 with shape (N)
         """
         res = Quat.add(self, other)
@@ -261,7 +312,8 @@ class Quat:
 
         Returns
         -------
-            Quat or np.ndarray: The result. If other is batched, returns an array of Quats
+            Quat or np.ndarray:
+                The result. If other is batched, returns an array of Quats
                 with shape (N)
         """
         res = Quat.sub(self, other)
@@ -277,6 +329,17 @@ class Quat:
             of this quaternion.
         """
         return Quat(Quat.conjugate(self))
+
+
+    def _instance_scalar_multiply(self, other: Union[int, float, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Multiplies the given scalar s to this q: q * s = sa + sbi + scj + sdk
+        """
+        res = Quat.scalar_multiply(self, other)
+        if res.ndim == 1:
+            return Quat(res)
+        else:
+            return np.asarray([Quat(elem) for elem in res])
 
 
     def normalize_(self):
@@ -331,6 +394,20 @@ class Quat:
         return self
 
 
+    def scalar_multiply_(self, other: Union[int, float, np.ndarray]):
+        """
+            Replace this quaternion q by scalar multiplication with scalar s:
+            q * s = s * q = sa + sbi + scj + sdk
+        """
+        if isinstance(other, np.ndarray):
+            if other.ndim > 1 and other.shape[0] != 1:
+                raise ValueError(f"Expected a single scalar as argument, but got {other.shape[0]} scalars!")
+            if other.ndim == 2:
+                other = other[0]
+        self.quat_ = Quat.scalar_multiply(self, other)
+        return self
+
+
     @staticmethod
     def _convert_and_align(q: Union[Quat, np.ndarray],
                            p: Union[Quat, np.ndarray] = None
@@ -377,7 +454,8 @@ class Quat:
 
         Returns
         -------
-            float or np.ndarray: Norm of the quaternion(s).
+            float or np.ndarray:
+                Norm of the quaternion(s).
         """
         q, single = Quat._convert_and_align(q)
         norm = np.linalg.norm(q, axis=1).reshape(-1, 1)
@@ -406,6 +484,7 @@ class Quat:
     def hamilton_product(q: Union[Quat, np.ndarray], p: Union[Quat, np.ndarray]) -> np.ndarray:
         """
             Calculates the Hamilton product of (possibly batched) quaternions q and p
+            Note that in general, this is not commutative: q*p != p*q
 
         Params
         ------
@@ -416,7 +495,8 @@ class Quat:
 
         Returns
         -------
-            np.ndarray: The Hamilton product q * p
+            np.ndarray:
+                The Hamilton product q * p
         """
         q, q_single, p, p_single = Quat._convert_and_align(q, p)
         qa = q[:, 0].reshape(-1, 1)
@@ -453,7 +533,8 @@ class Quat:
 
         Returns
         -------
-            np.ndarray: Sum q + p
+            np.ndarray:
+                Sum q + p
         """
         q, q_single, p, p_single = Quat._convert_and_align(q, p)
         res = q + p
@@ -475,7 +556,8 @@ class Quat:
 
         Returns
         -------
-            np.ndarray: q - p
+            np.ndarray:
+                q - p
         """
         q, q_single, p, p_single = Quat._convert_and_align(q, p)
         res = q - p
@@ -498,7 +580,8 @@ class Quat:
 
         Returns
         -------
-            np.ndarray: The conjugate
+            np.ndarray:
+                The conjugate
         """
         q, single = Quat._convert_and_align(q)
         res = q * np.asarray([1, -1, -1, -1])
@@ -510,7 +593,7 @@ class Quat:
     @staticmethod
     def scalar_multiply(q: Union[Quat, np.ndarray], s: Union[float, int, np.ndarray]) -> np.ndarray:
         """
-            Calculates (possibly batched) scalar multiplication of quaternion q with scalar s
+            Calculates (possibly batched) scalar multiplication of quaternion q with scalar s:
             s * q = q * s = sa + sbi + scj + sdk
 
         Params
@@ -525,7 +608,8 @@ class Quat:
 
         Returns
         -------
-            np.ndarray: The resulting quaternion. If multiple scalars where provided,
+            np.ndarray:
+                The resulting quaternion. If multiple scalars where provided,
                 The result is a (N, 4) array, otherwise (4)
         """
         if not isinstance(q, Quat) and not isinstance(q, np.ndarray):
@@ -547,9 +631,10 @@ class Quat:
             return q * s
 
         if isinstance(s, np.ndarray):
-            # Verify that s has valid shape: (1) or (N, 1) where N == batch size of quaternion if quaternion is batched
+            # Verify that s has valid shape: (1), (N), or (N, 1) where N == batch size of quaternion if quaternion is batched
+            # Reshape (N) to (N, 1)
             if s.ndim == 1 and s.shape[0] != 1:
-                raise ValueError(f"Expected single dimensional scalar array to contain only one element, got {s.shape[0]}. If you want to (independently) multiply multiple scalars, provide them as (N, 1) dimensional array!")
+                raise ValueError(f"Expected batched scalar to have shape (N, 1) but got ({s.shape})")
             if s.ndim == 2 and s.shape[1] != 1:
                 raise ValueError(f"Expected batched scalar s to have shape (N, 1) but got (N, {s.shape[1]})!")
             if s.ndim > 2:
