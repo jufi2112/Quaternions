@@ -1,7 +1,7 @@
 """
     TODOs
 
-    - [] conjugate_p_by_Q
+    - [] conjugate_p_by_q
     - [] rotate
     - [] create from vector representation
     - [] div
@@ -50,6 +50,8 @@ class Quat:
         self.hamilton_product = self._instance_hamilton_product
         self.pow = self._instance_pow
         self.reciprocal = self._instance_reciprocal
+        self.div_lhand = self._instance_div_lhand
+        self.div_rhand = self._instance_div_rhand
 
 
     def __str__(self):
@@ -77,6 +79,8 @@ class Quat:
                     return y.__rmul__(x)
                 if ufunc is np.matmul:
                     return y.__rmatmul__(x)
+                if ufunc is np.divide:
+                    return y.__rtruediv__(x)
             if isinstance(x, np.float64) and isinstance(y, Quat):
                 if ufunc is np.add:
                     return y.__radd__(x)
@@ -86,6 +90,8 @@ class Quat:
                     return y.__rmul__(x)
                 if ufunc is np.matmul:
                     return y.__rmatmul__(x)
+                if ufunc is np.divide:
+                    return y.__rtruediv__(x)
         return NotImplemented
 
 
@@ -205,28 +211,91 @@ class Quat:
         return NotImplemented
 
 
-    # Div is: q @ x = m --> x = q^-1 @ m
-    # def __truediv__(self, other: Union[np.ndarray, int, float]) -> Quat:
-    #     """
-    #         Scalar division of q by other, equivalent to q * 1/other
-    #     """
-    #     if isinstance(other, int) or isinstance(other, float):
-    #         if other == 0:
-    #             raise ZeroDivisionError("Parameter other is zero!")
-    #         return self * (1/other)
-    #     if isinstance(other, np.ndarray):
-    #         if other.ndim == 1:
-    #             if len(other) == 1:
-    #                 return self * (1/other)
-    #             else:
-    #                 raise ValueError(f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
-    #         elif other.ndim == 2:
-    #             if other.shape[1] == 1:
-    #                 return self * (1/other)
-    #             else:
-    #                 raise ValueError(f"Expected batched scalar array to have shape (N, 1), got {other.shape}")
+    def __truediv__(self, other: Union[Quat, np.ndarray, int, float]) -> Union[Quat, np.ndarray]:
+        """
+            Division of q by scalar other. If you want to divide by a quaternion,
+            use div_lhand() or div_rhand() methods.
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            if other == 0:
+                raise ZeroDivisionError("Parameter other is zero!")
+            return self * (1/other)
+        if isinstance(other, Quat):
+            raise TypeError("Division of one quaternion by another is not unique, use div_lhand() or div_rhand() instead.")
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1:
+                if len(other) == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError(f"Encountered zero in scalar array other: {other}")
+                    return self * (1/other)
+                elif len(other) == 4:
+                    raise TypeError("Division of one quaternion by another is not unique, use div_lhand() or div_rhand() instead.")
+                else:
+                    raise ValueError(f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want to multiply by multiple scalar values, provide them via a (N, 1)-shaped array!")
+            elif other.ndim == 2:
+                if other.shape[1] == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError(f"Scalar array other contains 0 entry: {other}")
+                    return self * (1/other)
+                elif other.shape[1] == 4:
+                    raise TypeError("Division of one quaternion by another is not unique, use div_lhand() or div_rhand() instead.")
+                else:
+                    raise ValueError(f"Expected batched array to have shape (N, 1) or (N, 4), got {other.shape}")
+        return NotImplemented
 
-    #     return NotImplemented
+
+    def __rtruediv__(self, other: Union[int, float, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Reverse true division of scalar other by this quaternion q given by:
+            other * q^-1
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            return self.reciprocal() * other
+        if isinstance(other, np.ndarray):
+            err_msg = (f"Expected scalar of shape (1) or (N, 1), got {other.shape}. If you want " +
+                        "to divide multiple scalar values by a quaternion, provide them as " +
+                        "(N, 1)-shaped array!")
+            if other.ndim == 1:
+                if len(other) == 1:
+                    return self.reciprocal() * other
+                else:
+                    raise ValueError(err_msg)
+            elif other.ndim == 2:
+                if other.shape[1] == 1:
+                    return self.reciprocal() * other
+                else:
+                    raise ValueError(err_msg)
+            else:
+                raise ValueError(f"Expected scalar to be of shape (1) or (N, 1), got {other.shape}")
+        return NotImplemented
+
+
+    def __itruediv__(self, other: Union[int, float, np.ndarray, Quat]) -> Quat:
+        if isinstance(other, int) or isinstance(other, float):
+            if math.isclose(other, 0):
+                raise ZeroDivisionError("Argument other is zero!")
+            self = self / other
+            return self
+        if isinstance(other, Quat):
+            raise TypeError(
+                f"Division of one quaternion with another is not unique, use div_lhand_() or "
+                "div_rhand_() instead"
+            )
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1 and len(other) == 1:
+                self = self / other
+                return self
+            elif other.ndim == 2 and other.shape[0] == 1 and other.shape[1] == 1:
+                other = other[0]
+                self = self / other
+                return self
+            else:
+                raise ValueError(
+                    f"Expected other to be of shape (1) or (1, 1), got {other.shape}. Division of "
+                    "one quaternion with another is not unique, use div_lhand_() or div_rhand_() "
+                    "instead."
+                )
+        return NotImplemented
 
 
     def __matmul__(self, other: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
@@ -312,7 +381,7 @@ class Quat:
     def is_zero(self) -> bool:
         """
             Returns whether all coefficients are zero, i.e.
-            q = + + 0i + 0j + 0k
+            q = 0 + 0i + 0j + 0k
         """
         return np.isclose(self.norm(), 0)
 
@@ -509,8 +578,97 @@ class Quat:
             Quat:
                 q^-1
         """
+        if self.is_zero():
+            raise ZeroDivisionError("Cannot calculate reciprocal of zero quaternion")
         return self.conjugate() * (1/(self.norm() ** 2))
 
+    # Div is: Given m = q @ x --> x = q^-1 @ m and q = m @ x^-1
+    def _instance_div_lhand(self, other: Union[int, float, Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Calculates (possibly batched) left hand division
+            of this quaternion q and scalar or quaternion other:
+                q / other = (other)^-1 * q
+            If other is a scalar, the result is the same as div_rhand()
+            and operator '/'.
+            If other is a quaternion, left hand division is the inverse of the @
+            operator (hamilton product) if you want to infer the quaternion to the right
+            of the @ operator, i.e. given
+                r = q @ p
+            you can use r.div_lhand(q) to obtain
+                p = q^-1 @ r.
+            If you want to obtain q from the above equation, use div_rhand() instead.
+
+        Params
+        ------
+            other: (int or float or Quat or np.ndarray):
+                The value that should be left-hand divided to this quaternion. Can be of shape
+                (1) or (N, 1) for scalars and (4) or (N, 4) for quaternions.
+
+        Returns
+        -------
+            Quat or np.ndarray of Quat:
+                The result of the calculation (other)^-1 * this. If other is batched, a np.ndarray
+                of Quats is returned
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            return self / other
+        if isinstance(other, Quat):
+            return other.reciprocal() @ self
+        if isinstance(other, np.ndarray):
+            if (other.ndim == 1 and len(other) == 1) or (other.ndim == 2 and other.shape[1] == 1):
+                return self / other
+            elif other.ndim == 1 and len(other) == 4:
+                return Quat(Quat.hamilton_product(Quat.reciprocal(other), self))
+            elif other.ndim == 2 and other.shape[1] == 4:
+                res = Quat.hamilton_product(Quat.reciprocal(other), self)
+                return np.asarray([Quat(elem) for elem in res])
+            else:
+                raise ValueError(f"Expected other array to have shape (1), (4), (N, 1), or (N, 4) but got shape {other.shape}")
+        raise TypeError(f"Expected type int, float, Quat, or np.ndarray, got {type(other)}")
+
+
+    def _instance_div_rhand(self, other: Union[int, float, Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Calculates (possibly batched) right hand division
+            of this quaternion q and scalar or quaternion other:
+                q / other = q * (other)^-1
+            If other is a scalar, the result is the same as div_lhand()
+            and operator '/'.
+            If other is a quaternion, right hand division is the inverse of the @
+            operator (hamilton product) if you want to infer the quaternion to the left
+            of the @ operator, i.e. given
+                r = q @ p
+            you can use r.div_rhand(p) to obtain
+                q = r @ p^-1.
+            If you want to obtain p from the above equation, use div_lhand() instead.
+
+        Params
+        ------
+            other: (int or float or Quat or np.ndarray):
+                The value that should be right-hand divided to this quaternion. Can be of shape
+                (1) or (N, 1) for scalars and (4) or (N, 4) for quaternions.
+
+        Returns
+        -------
+            Quat or np.ndarray of Quat:
+                The result of the calculation this * (other)^-1. If other is batched, a np.ndarray
+                of Quats is returned
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            return self / other
+        if isinstance(other, Quat):
+            return self @ other.reciprocal()
+        if isinstance(other, np.ndarray):
+            if (other.ndim == 1 and len(other) == 1) or (other.ndim == 2 and other.shape[1] == 1):
+                return self / other
+            elif other.ndim == 1 and len(other) == 4:
+                return Quat(Quat.hamilton_product(self, Quat.reciprocal(other)))
+            elif other.ndim == 2 and other.shape[1] == 4:
+                res = Quat.hamilton_product(self, Quat.reciprocal(other))
+                return np.asarray([Quat(elem) for elem in res])
+            else:
+                raise ValueError(f"Expected other array to have shape (1), (4), (N, 1), or (N, 4) but got shape {other.shape}")
+        raise TypeError(f"Expected type int, float, Quat, or np.ndarray, got {type(other)}")
 
 
     def normalize_(self) -> Quat:
@@ -606,9 +764,102 @@ class Quat:
         """
             Replaces this quaternion q by its reciprocal q^-1
         """
+        if self.is_zero():
+            raise ZeroDivisionError("Cannot calculate reciprocal for zero quaternion")
         self.quat_ = Quat.reciprocal(self)
         return self
 
+
+    def div_lhand_(self, other: Union[int, float, Quat, np.ndarray]) -> Quat:
+        """
+            Inplace left-hand division of this quaternion by other:
+                (other)^-1 * this
+
+        Params
+        ------
+            other (int or float or Quat or np.ndarray):
+                Scalar of shape (1) or (1, 1) or quaternion of shape (4) or (1, 4)
+
+        Returns
+        -------
+            Quat:
+                This quaternion after other has been left-hand divided
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            if math.isclose(other, 0):
+                raise ZeroDivisionError("Other is zero")
+            self.quat_ *= (1/other)
+            return self
+        if isinstance(other, Quat):
+            self.quat_ = Quat.hamilton_product(other.reciprocal(), self.quat_)
+            return self
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1:
+                if len(other) == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError("Other is zero!")
+                    self.quat_ *= (1/other)
+                    return self
+                elif len(other) == 4:
+                    self.quat_ = Quat.hamilton_product(Quat.reciprocal(other), self.quat_)
+                    return self
+            elif other.ndim == 2 and other.shape[0] == 1:
+                if other.shape[1] == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError("Other is zero!")
+                    self.quat_ *= (1/other[0])
+                    return self
+                elif other.shape[1] == 4:
+                    self.quat_ = Quat.hamilton_product(Quat.reciprocal(other[0]), self.quat_)
+                    return self
+            raise ValueError(f"Expected other to be of shape (1), (4), (1,1), or (1,4) but got {other.shape}")
+        raise TypeError(f"Expected other to be of type int, float, Quat, or np.ndarray but got {type(other)}")
+
+
+    def div_rhand_(self, other: Union[int, float, Quat, np.ndarray]) -> Quat:
+        """
+            Inplace right-hand division of this quaternion by other:
+                this * (other)^-1
+
+        Params
+        ------
+            other (int or float or Quat or np.ndarray):
+                Scalar of shape (1) or (1, 1) or quaternion of shape (4) or (1, 4)
+
+        Returns
+        -------
+            Quat:
+                This quaternion after other has been right-hand divided
+        """
+        if isinstance(other, int) or isinstance(other, float):
+            if math.isclose(other, 0):
+                raise ZeroDivisionError("Other is zero")
+            self.quat_ *= (1/other)
+            return self
+        if isinstance(other, Quat):
+            self.quat_ = Quat.hamilton_product(self.quat_, other.reciprocal())
+            return self
+        if isinstance(other, np.ndarray):
+            if other.ndim == 1:
+                if len(other) == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError("Other is zero!")
+                    self.quat_ *= (1/other)
+                    return self
+                elif len(other) == 4:
+                    self.quat_ = Quat.hamilton_product(self.quat_, Quat.reciprocal(other))
+                    return self
+            elif other.ndim == 2 and other.shape[0] == 1:
+                if other.shape[1] == 1:
+                    if np.isclose(other, 0).any():
+                        raise ZeroDivisionError("Other is zero!")
+                    self.quat_ *= (1/other[0])
+                    return self
+                elif other.shape[1] == 4:
+                    self.quat_ = Quat.hamilton_product(self.quat_, Quat.reciprocal(other[0]))
+                    return self
+            raise ValueError(f"Expected other to be of shape (1), (4), (1,1), or (1,4) but got {other.shape}")
+        raise TypeError(f"Expected other to be of type int, float, Quat, or np.ndarray but got {type(other)}")
 
 
     @staticmethod
@@ -617,6 +868,8 @@ class Quat:
                            ) -> Union[Tuple[np.ndarray, bool], Tuple[np.ndarray, bool, np.ndarray, bool]]:
         if isinstance(q, Quat):
             q = q.numpy()
+        if isinstance(q, np.ndarray) and q.ndim == 1 and isinstance(q[0], Quat):
+            q = np.asarray([x.numpy() for x in q])
         q_single = False
         if q.ndim == 1:
             q_single = True
@@ -625,6 +878,8 @@ class Quat:
         if p is not None:
             if isinstance(p, Quat):
                 p = p.numpy()
+            if isinstance(p, np.ndarray) and p.ndim == 1 and isinstance(p[0], Quat):
+                p = np.asarray([x.numpy() for x in p])
             p_single = False
             if p.ndim == 1:
                 p_single = True
@@ -636,7 +891,7 @@ class Quat:
             if p.shape[0] == 1 and q.shape[0] > 1:
                 p = np.tile(p, (q.shape[0], 1))
             if (q.shape[1] != 4) or (p.shape[1] != 4):
-                raise ValueError(f"Both quaternions have to have 4 elements, got {q.shape[1]} and {p.shape[1]}")
+                raise ValueError(f"Both quaternions have to have 4 elements, got arrays {q.shape} and {p.shape}")
 
             return q, q_single, p, p_single
         else:
@@ -919,4 +1174,15 @@ class Quat:
                 raise ValueError(f"Expected quaternion to be of shape (4) or (N, 4), got {q.shape}")
         q_conj = Quat.conjugate(q)
         q_norm_squared = Quat.norm(q) ** 2
+        if np.isclose(q_norm_squared, 0).any():
+            raise ZeroDivisionError("Cannot calculate reciprocal of zero quaternion.")
         return q_conj * (1/q_norm_squared)
+
+
+    @staticmethod
+    def div_lhand(numerator: Union[Quat, np.ndarray], denominator: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            For given numerator q and denominator p, calculates left hand division
+                q / p = p^-1 @ q
+        """
+        raise NotImplementedError()

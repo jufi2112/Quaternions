@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from quat import Quat
+import math
 
 class TestQuat(unittest.TestCase):
 
@@ -726,6 +727,35 @@ class TestQuat(unittest.TestCase):
                       )
             self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
 
+        # Numpy arrays of Quat
+        a = np.random.rand(10, 4) - 0.5
+        q = np.asarray([Quat(elem) for elem in a])
+        p = np.random.rand(4) - 0.5
+        a2, b2, c2, d2 = p
+        res = Quat.hamilton_product(q, p)
+        for i, x in enumerate(a):
+            a1, b1, c1, d1 = x
+            res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+            self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
+        a = np.random.rand(10, 4) - 0.5
+        q = np.asarray([Quat(elem) for elem in a])
+        b = np.random.rand(10, 4) - 0.5
+        p = np.asarray([Quat(elem) for elem in b])
+        res = Quat.hamilton_product(q, p)
+        for i, _ in enumerate(q):
+            a1, b1, c1, d1 = a[i]
+            a2, b2, c2, d2 = b[i]
+            res_gt = Quat(a=(a1*a2 - b1*b2 - c1*c2 - d1*d2),
+                      b=(a1*b2 + b1*a2 + c1*d2 - d1*c2),
+                      c=(a1*c2 - b1*d2 + c1*a2 + d1*b2),
+                      d=(a1*d2 + b1*c2 - c1*b2 + d1*a2)
+                      )
+            self.assertTrue(np.isclose(res[i], res_gt.numpy()).all())
+
         # Test invalid values
         s_int = np.random.randint(-10, 10)
         s_float = np.random.rand(1)[0] - 0.5
@@ -924,6 +954,467 @@ class TestQuat(unittest.TestCase):
     #######################################
 
 
+    #################################
+    #   Start Testing of Division   #
+    #################################
+
+    def test_operator_true_division(self):
+        a = np.random.rand(4)
+        q = Quat(a)
+        s_int = np.random.randint(-10, 10)
+        while s_int == 0:
+            s_int = np.random.randint(-10, 10)
+        s_int_zero = 0
+        s_float = np.random.rand(1)[0] - 0.5
+        while s_float == 0:
+            s_float = np.random.rand(1)[0] - 0.5
+        s_float_zero = 0.0
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        while np.isclose(s_arr_onedim_single, 0).any():
+            s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_onedim_single_zero = np.asarray([0])
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        while np.isclose(s_arr_twodim_single, 0).any():
+            s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        s_arr_twodim_single_zero = np.asarray([[0]])
+        s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        while np.isclose(s_arr_twodim_multi, 0).any():
+            s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        s_arr_twodim_multi_zero = np.zeros((10, 1))
+
+        # Division by scalars
+        mul_res = q * s_int
+        res = mul_res / s_int
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(q.numpy(), res.numpy()).all())
+        mul_res = q * s_float
+        res = mul_res / s_float
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(q.numpy(), res.numpy()).all())
+        mul_res = q * s_arr_onedim_single
+        res = mul_res / s_arr_onedim_single
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(q.numpy(), res.numpy()).all())
+        mul_res = q * s_arr_twodim_single
+        self.assertIsInstance(mul_res, np.ndarray)
+        res = mul_res[0] / s_arr_twodim_single
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 1 and len(res) == 1)
+        self.assertIsInstance(res[0], Quat)
+        self.assertTrue(np.isclose(res[0].numpy(), q.numpy()).all())
+        res = q / s_arr_twodim_multi
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), q.numpy() / s_arr_twodim_multi[i]).all())
+
+        # Division by zero scalar
+        with self.assertRaises(ZeroDivisionError):
+            q / s_int_zero
+        with self.assertRaises(ZeroDivisionError):
+            q / s_float_zero
+        with self.assertRaises(ZeroDivisionError):
+            q / s_arr_onedim_single_zero
+        with self.assertRaises(ZeroDivisionError):
+            q / s_arr_twodim_single_zero
+        with self.assertRaises(ZeroDivisionError):
+            q / s_arr_twodim_multi_zero
+
+        # Division by other quaternion is not supported
+        p = Quat(np.random.rand(4) - 0.5)
+        with self.assertRaises(TypeError):
+            q / p
+        o = np.random.rand(4) - 0.5
+        with self.assertRaises(TypeError):
+            q / o
+        n = np.random.rand(10, 4) - 0.5
+        with self.assertRaises(TypeError):
+            q / n
+
+        # Invalid values
+        b = np.random.rand(3)
+        with self.assertRaises(ValueError):
+            q / b
+        b = np.random.rand(10, 5)
+        with self.assertRaises(ValueError):
+            q / b
+
+
+    def test_operator_reverse_true_division(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        s_int = np.random.randint(-10, 10)
+        while s_int == 0:
+            s_int = np.random.randint(-10, 10)
+        s_int_zero = 0
+        s_float = np.random.rand(1)[0] - 0.5
+        while s_float == 0:
+            s_float = np.random.rand(1)[0] - 0.5
+        s_float_zero = 0.0
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        while np.isclose(s_arr_onedim_single, 0).any():
+            s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_onedim_single_zero = np.asarray([0])
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        while np.isclose(s_arr_twodim_single, 0).any():
+            s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        s_arr_twodim_single_zero = np.asarray([[0]])
+        s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        while np.isclose(s_arr_twodim_multi, 0).any():
+            s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+        s_arr_twodim_multi_zero = np.zeros((10, 1))
+
+        # Scalar divided by quaternion
+        res = s_int / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), s_int * q.reciprocal().numpy()).all())
+        res = s_float / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), s_float * q.reciprocal().numpy()).all())
+        res = s_int_zero / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(res.is_zero())
+        res = s_float_zero / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(res.is_zero())
+        res = s_arr_onedim_single / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(np.isclose(res.numpy(), s_arr_onedim_single * q.reciprocal().numpy()).all())
+        res = s_arr_onedim_single_zero / q
+        self.assertIsInstance(res, Quat)
+        self.assertTrue(res.is_zero())
+        res = s_arr_twodim_single / q
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), (s_arr_twodim_single[i] * q.reciprocal()).numpy()).all())
+        res = s_arr_twodim_single_zero / q
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(x.is_zero())
+        res = s_arr_twodim_multi / q
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.numpy(), (s_arr_twodim_multi[i] * q.reciprocal()).numpy()).all())
+        res = s_arr_twodim_multi_zero / q
+        self.assertIsInstance(res, np.ndarray)
+        for i, x in enumerate(res):
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(x.is_zero())
+
+        # Invalid arguments
+        with self.assertRaises(ValueError):
+            np.random.rand(3) / q
+        with self.assertRaises(ValueError):
+            np.random.rand(10, 5) / q
+
+
+    def test_operator_inplace_true_division(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        s_int = np.random.randint(-10, 10)
+        while s_int == 0:
+            s_int = np.random.randint(-10, 10)
+        s_int_zero = int(0)
+        s_float = np.random.rand(1)[0] - 0.5
+        while math.isclose(s_float,  0):
+            s_float = np.random.rand(1)[0] - 0.5
+        s_float_zero = 0
+        s_arr_onedim = np.random.rand(1) - 0.5
+        s_arr_twodim = np.random.rand(1, 1) - 0.5
+        q /= s_int
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), (Quat(a) / s_int).numpy()).all())
+        q = Quat(a)
+        q /= s_float
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), (Quat(a) / s_float).numpy()).all())
+        q = Quat(a)
+        q /= s_arr_onedim
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), (Quat(a) / s_arr_onedim).numpy()).all())
+        q = Quat(a)
+        q /= s_arr_twodim
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), (Quat(a) / s_arr_twodim)[0].numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q /= s_int_zero
+        with self.assertRaises(ZeroDivisionError):
+            q /= s_float_zero
+
+        # Invalid entries
+        p = Quat(1,2,3,4)
+        with self.assertRaises(TypeError):
+            q /= p
+        p = np.random.rand(2)
+        with self.assertRaises(ValueError):
+            q /= p
+        p = np.random.rand(3, 1)
+        with self.assertRaises(ValueError):
+            q /= p
+        p = np.random.rand(5, 3)
+        with self.assertRaises(ValueError):
+            q /= p
+
+
+    def test_member_div(self):
+        a = np.random.rand(4) - 0.5
+        q = Quat(a)
+        b = np.random.rand(4) - 0.5
+        p = Quat(b)
+        q_multi = np.random.rand(10, 4) - 0.5
+        p_multi = np.random.rand(10, 4) - 0.5
+        s_int = np.random.randint(-10, 10)
+        while s_int == 0:
+            s_int = np.random.randint(-10, 10)
+        s_int_zero = int(0)
+        s_float = np.random.rand(1)[0] - 0.5
+        while s_float == 0.0:
+            s_float = np.random.rand(1)[0] - 0.5
+        s_float_zero = float(0)
+        s_arr_onedim = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1, 1) - 0.5
+        s_arr_twodim_multi = np.random.rand(10, 1) - 0.5
+
+        # Quaternion div scalar
+        lh = q.div_lhand(s_int)
+        rh = q.div_rhand(s_int)
+        self.assertIsInstance(lh, Quat)
+        self.assertIsInstance(rh, Quat)
+        self.assertTrue(np.isclose(lh.numpy(), (q / s_int).numpy()).all())
+        self.assertTrue(np.isclose(lh.numpy(), rh.numpy()).all())
+        lh = q.div_lhand(s_float)
+        rh = q.div_rhand(s_float)
+        self.assertIsInstance(lh, Quat)
+        self.assertIsInstance(rh, Quat)
+        self.assertTrue(np.isclose(lh.numpy(), (q / s_float).numpy()).all())
+        self.assertTrue(np.isclose(lh.numpy(), rh.numpy()).all())
+        lh = q.div_lhand(s_arr_onedim)
+        rh = q.div_rhand(s_arr_onedim)
+        self.assertIsInstance(lh, Quat)
+        self.assertIsInstance(rh, Quat)
+        self.assertTrue(np.isclose(lh.numpy(), (q / s_arr_onedim).numpy()).all())
+        self.assertTrue(np.isclose(lh.numpy(), rh.numpy()).all())
+        lh = q.div_lhand(s_arr_twodim_single)
+        rh = q.div_rhand(s_arr_twodim_single)
+        self.assertIsInstance(lh, np.ndarray)
+        self.assertIsInstance(rh, np.ndarray)
+        for i, x in enumerate(lh):
+            self.assertIsInstance(x, Quat)
+            self.assertIsInstance(rh[i], Quat)
+            self.assertTrue(np.isclose(x.numpy(), (q / s_arr_twodim_single[i]).numpy()).all())
+            self.assertTrue(np.isclose(x.numpy(), rh[i].numpy()).all())
+        lh = q.div_lhand(s_arr_twodim_multi)
+        rh = q.div_rhand(s_arr_twodim_multi)
+        self.assertIsInstance(lh, np.ndarray)
+        self.assertIsInstance(rh, np.ndarray)
+        for i, x in enumerate(lh):
+            self.assertIsInstance(x, Quat)
+            self.assertIsInstance(rh[i], Quat)
+            self.assertTrue(np.isclose(x.numpy(), (q / s_arr_twodim_multi[i]).numpy()).all())
+            self.assertTrue(np.isclose(x.numpy(), rh[i].numpy()).all())
+
+        # Check zero division errors
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand(s_int_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand(s_int_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand(s_float_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand(s_float_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand(np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand(np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand(np.asarray([[0], [1]]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand(np.asarray([[1], [0]]))
+
+        # Quaternion div single quaternion
+        r = q @ p
+        q_div = r.div_rhand(p)
+        p_div = r.div_lhand(q)
+        self.assertIsInstance(q_div, Quat)
+        self.assertIsInstance(p_div, Quat)
+        self.assertTrue(np.isclose(q_div.numpy(), q.numpy()).all())
+        self.assertTrue(np.isclose(p_div.numpy(), p.numpy()).all())
+
+        # Quaternion div multiple quaternions
+        q = np.random.rand(10, 4) - 0.5
+        for x in q:
+            # assume r = n @ p where p is unknown and n is known
+            r = Quat(x)
+            n = np.random.rand(10, 4) - 0.5
+            # calculate p by left hand division: p = n^-1 @ r
+            p = r.div_lhand(n)
+            self.assertIsInstance(p, np.ndarray)
+            # make sure that n @ p again equals r
+            r_hat = Quat.hamilton_product(n, p)
+            for y in r_hat:
+                self.assertIsInstance(y, np.ndarray)
+                self.assertTrue(np.isclose(y, r.numpy()).all())
+        q = np.random.rand(10, 4) - 0.5
+        for x in q:
+            # assume r = n @ p where p is known and n is unknown
+            r = Quat(x)
+            p = np.random.rand(10, 4) - 0.5
+            # calculate n by right hand division n = r @ p^-1
+            n = r.div_rhand(p)
+            self.assertIsInstance(n, np.ndarray)
+            # make sure that n @ p again equals r
+            r_hat = Quat.hamilton_product(n, p)
+            for y in r_hat:
+                self.assertIsInstance(y, np.ndarray)
+                self.assertTrue(np.isclose(y, r.numpy()).all())
+
+
+    def test_member_inplace_div(self):
+        a = np.random.rand(4) - 0.5
+        b = np.random.rand(4) - 0.5
+        s_arr_onedim_single = np.random.rand(1) - 0.5
+        s_arr_twodim_single = np.random.rand(1,1) - 0.5
+
+        s_int = np.random.randint(-20, 20)
+        while s_int == 0:
+            s_int = np.random.randint(-20, 20)
+        s_int_zero = int(0)
+        s_float = np.random.rand(1)[0] - 0.5
+        while np.isclose(s_float, 0):
+            s_float = np.random.rand(1)[0] - 0.5
+        s_float_zero = float(0)
+
+        # Quaternion div scalar
+        ### lhand
+        q = Quat(a)
+        q.div_lhand_(s_int)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(s_int).numpy()).all())
+        q = Quat(a)
+        q.div_lhand_(s_float)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(s_float).numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(s_int_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(s_float_zero)
+        q = Quat(a)
+        q.div_lhand_(s_arr_onedim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(s_arr_onedim_single).numpy()).all())
+        q = Quat(a)
+        q.div_lhand_(s_arr_twodim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(s_arr_twodim_single)[0].numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(np.asarray([[0]]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([1,2]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([[1],[2]]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([[1,2],[3,4]]))
+        ### rhand
+        q = Quat(a)
+        q.div_rhand_(s_int)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(s_int).numpy()).all())
+        q = Quat(a)
+        q.div_rhand_(s_float)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(s_float).numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(s_int_zero)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(s_float_zero)
+        q = Quat(a)
+        q.div_rhand_(s_arr_onedim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(s_arr_onedim_single).numpy()).all())
+        q = Quat(a)
+        q.div_rhand_(s_arr_twodim_single)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(s_arr_twodim_single)[0].numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(np.asarray([[0]]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([1,2]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([[1],[2]]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([[1,2],[3,4]]))
+
+        # Quaternion div quaternion
+        q = Quat(a)
+        p = Quat(b)
+        q.div_lhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(p).numpy()).all())
+        q = Quat(a)
+        q.div_rhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(p).numpy()).all())
+        q = Quat(a)
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(Quat())
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(Quat())
+
+        # Quaternion div numpy quaternion
+        p = np.random.rand(4) - 0.5
+        q = Quat(a)
+        q.div_lhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(p).numpy()).all())
+        q = Quat(a)
+        q.div_rhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(p).numpy()).all())
+        p = np.random.rand(1, 4) - 0.5
+        q = Quat(a)
+        q.div_lhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_lhand(p)[0].numpy()).all())
+        q = Quat(a)
+        q.div_rhand_(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.numpy(), Quat(a).div_rhand(p)[0].numpy()).all())
+        with self.assertRaises(ZeroDivisionError):
+            q.div_lhand_(np.asarray([0,0,0,0]))
+        with self.assertRaises(ZeroDivisionError):
+            q.div_rhand_(np.asarray([[0,0,0,0]]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([0,1]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([0,1]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([[0,1,0,0], [0,1,1,1]]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([[0,1,0,0], [0,1,1,1]]))
+        with self.assertRaises(ValueError):
+            q.div_lhand_(np.asarray([[0,1,3]]))
+        with self.assertRaises(ValueError):
+            q.div_rhand_(np.asarray([[0,1,3]]))
+
+
+
+    ###############################
+    #   End Testing of Division   #
+    ###############################
+
+
     ############################
     #   Start Testing of Pow   #
     ############################
@@ -1068,6 +1559,15 @@ class TestQuat(unittest.TestCase):
         res = Quat.hamilton_product(q, q_rec)
         for x in res:
             self.assertTrue(np.isclose(x, np.asarray([1,0,0,0])).all())
+        q = np.zeros(4)
+        with self.assertRaises(ZeroDivisionError):
+            Quat.reciprocal(q)
+        q = np.zeros((10,4))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.reciprocal(q)
+        q = np.asarray([[1,2,3,4], [0,0,0,0], [4,3,2,1]])
+        with self.assertRaises(ZeroDivisionError):
+            Quat.reciprocal(q)
 
         # Invalid values
         s_int = np.random.randint(-10, 10)
@@ -1089,6 +1589,9 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(rec, Quat)
         self.assertTrue(np.isclose(Quat.hamilton_product(q, rec), np.asarray([1,0,0,0])).all())
         self.assertTrue(np.isclose(Quat.hamilton_product(rec, q), np.asarray([1,0,0,0])).all())
+        q = Quat()
+        with self.assertRaises(ZeroDivisionError):
+            q.reciprocal()
 
 
     def test_member_inplace_reciprocal(self):
@@ -1098,11 +1601,18 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(q, Quat)
         self.assertTrue(np.isclose(Quat.hamilton_product(q, a), np.asarray([1,0,0,0])).all())
         self.assertTrue(np.isclose(Quat.hamilton_product(a, q), np.asarray([1,0,0,0])).all())
+        q = Quat()
+        with self.assertRaises(ZeroDivisionError):
+            q.reciprocal_()
 
     #################################
     #   End Testing of Reciprocal   #
     #################################
 
+
+    #############################
+    #   Start Testing of Norm   #
+    #############################
 
     def test_static_norm(self):
         a = np.random.rand(4) - 0.5
@@ -1156,6 +1666,10 @@ class TestQuat(unittest.TestCase):
         self.assertRaises(ValueError, Quat.normalize, np.zeros((10, 4)))
         a = np.asarray([[1,1,1,1], [0,0,0,0]])
         self.assertRaises(ValueError, Quat.normalize, a)
+
+    ###########################
+    #   End Testing of Norm   #
+    ###########################
 
 
     def test_static_conjugate(self):
