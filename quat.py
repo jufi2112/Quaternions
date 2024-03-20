@@ -1180,9 +1180,82 @@ class Quat:
 
 
     @staticmethod
-    def div_lhand(numerator: Union[Quat, np.ndarray], denominator: Union[Quat, np.ndarray]) -> np.ndarray:
+    def div_lhand(numerator: Union[Quat, np.ndarray, float, int], denominator: Union[Quat, np.ndarray, float, int]) -> np.ndarray:
         """
             For given numerator q and denominator p, calculates left hand division
                 q / p = p^-1 @ q
+            Does not support scalars for both numerator and denominator.
+
+        Params
+        ------
+            numerator (Quat or np.ndarray or float or int):
+                Scalar or quaternion numerator of shape (1), (4), (N, 1), or (N, 4)
+            denominator (Quat or np.ndarray or float or int):
+                Scalar or quaternion denominator of shape (1), (4), (N, 1), or (N, 4)
+
+        Returns
+        -------
+            np.ndarray:
+                The result (denominator)^-1 @ numerator of shape (4) or (N, 4)
         """
-        raise NotImplementedError()
+        # Why would you use this for scalar by scalar division?
+        if (isinstance(denominator, int) or isinstance(denominator, float)) and (isinstance(numerator, int) or isinstance(numerator, float)):
+            raise TypeError("Quat.div_lhand() is not designed for all scalar input")
+
+        # Quaternion / scalar
+        if isinstance(denominator, int) or isinstance(denominator, float):
+            if math.isclose(denominator, 0):
+                raise ZeroDivisionError("Denominator is zero!")
+            return Quat.scalar_multiply(numerator, (1/denominator))
+
+        # Scalar / Quaterion
+        if isinstance(numerator, int) or isinstance(numerator, float):
+            return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
+
+        # Quaternion / quaternion
+        num, num_single, denom, denom_single = Quat._convert_and_align(numerator, denominator)
+        res = Quat.hamilton_product(Quat.reciprocal(denom), num)
+        if num_single and denom_single:
+            return res[0]
+        return res
+
+
+    @staticmethod
+    def div_rhand(numerator: Union[Quat, np.ndarray, float, int], denominator: Union[Quat, np.ndarray, float, int]) -> np.ndarray:
+        """
+            For given numerator q and denominator p, calculates right hand division
+                q / p = q @ p^-1
+            Does not support scalars for both numerator and denominator.
+
+        Params
+        ------
+            numerator (Quat or np.ndarray or float or int):
+                Scalar or quaternion numerator of shape (1), (4), (N, 1), or (N, 4)
+            denominator (Quat or np.ndarray or float or int):
+                Scalar or quaternion denominator of shape (1), (4), (N, 1), or (N, 4)
+
+        Returns
+        -------
+            np.ndarray:
+                The result numerator @ (denominator)^-1 of shape (4) or (N, 4)
+        """
+        # Why would you use this for scalar by scalar division?
+        if (isinstance(denominator, int) or isinstance(denominator, float)) and (isinstance(numerator, int) or isinstance(numerator, float)):
+            raise TypeError("Quat.div_rhand() is not designed for all scalar input")
+
+        # Quaternion / scalar
+        if isinstance(denominator, int) or isinstance(denominator, float):
+            if math.isclose(denominator, 0):
+                raise ZeroDivisionError("Denominator is zero!")
+            return Quat.scalar_multiply(numerator, (1/denominator))
+
+        # Scalar / Quaterion
+        if isinstance(numerator, int) or isinstance(numerator, float):
+            return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
+
+        # Quaternion / quaternion
+        num, num_single, denom, denom_single = Quat._convert_and_align(numerator, denominator)
+        res = Quat.hamilton_product(num, Quat.reciprocal(denom))
+        if num_single and denom_single:
+            return res[0]
+        return res
