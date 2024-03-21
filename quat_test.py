@@ -1487,7 +1487,81 @@ class TestQuat(unittest.TestCase):
         with self.assertRaises(ZeroDivisionError):
             Quat.div_rhand(s_float, p_zero)
 
-        # TODO: Division with scalar represented as np array
+        # Division with scalar represented as np array
+        single_scalar = np.random.rand(1) - 0.5
+        multiple_scalars = np.random.rand(10, 1) - 0.5
+        # check providing both results in TypeError
+        with self.assertRaises(TypeError):
+            Quat.div_lhand(single_scalar, multiple_scalars)
+        with self.assertRaises(TypeError):
+            Quat.div_lhand(multiple_scalars, single_scalar)
+        with self.assertRaises(TypeError):
+            Quat.div_lhand(single_scalar, single_scalar)
+        with self.assertRaises(TypeError):
+            Quat.div_lhand(multiple_scalars, multiple_scalars)
+        with self.assertRaises(TypeError):
+            Quat.div_rhand(single_scalar, multiple_scalars)
+        with self.assertRaises(TypeError):
+            Quat.div_rhand(multiple_scalars, single_scalar)
+        with self.assertRaises(TypeError):
+            Quat.div_rhand(single_scalar, single_scalar)
+        with self.assertRaises(TypeError):
+            Quat.div_rhand(multiple_scalars, multiple_scalars)
+        # Quat / np scalar
+        a = np.random.rand(4) - 0.5
+        res = Quat.div_lhand(a, single_scalar)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 1 and len(res) == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(a, (1/single_scalar))).all())
+        res = Quat.div_rhand(a, single_scalar)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 1 and len(res) == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(a, (1/single_scalar))).all())
+        res = Quat.div_lhand(a, multiple_scalars)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 2 and res.shape[1] == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(a, (1/multiple_scalars))).all())
+        res = Quat.div_rhand(a, multiple_scalars)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 2 and res.shape[1] == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(a, (1/multiple_scalars))).all())
+        # np scalar / Quat
+        a = np.random.rand(4) - 0.5
+        while Quat(a).is_zero():
+            a = np.random.rand(4) - 0.5
+        res = Quat.div_lhand(single_scalar, a)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 1 and len(res) == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(Quat.reciprocal(a), single_scalar)).all())
+        res = Quat.div_rhand(single_scalar, a)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 1 and len(res) == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(Quat.reciprocal(a), single_scalar)).all())
+        res = Quat.div_lhand(multiple_scalars, a)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 2 and res.shape[1] == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(Quat.reciprocal(a), multiple_scalars)).all())
+        res = Quat.div_rhand(multiple_scalars, a)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(res.ndim == 2 and res.shape[1] == 4)
+        self.assertTrue(np.isclose(res, Quat.scalar_multiply(Quat.reciprocal(a), multiple_scalars)).all())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, np.asarray([[0], [0]]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, np.asarray([[1], [2], [0], [4]]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(np.asarray([1]), Quat())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, np.asarray([0]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, np.asarray([[0], [0]]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, np.asarray([[1], [2], [0], [4]]))
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(np.asarray([1]), Quat())
+
 
         # Single quaternion / single quaternion
         a = np.random.rand(4) - 0.5
@@ -1510,10 +1584,49 @@ class TestQuat(unittest.TestCase):
         self.assertTrue(np.isclose(res, res_np).all())
 
         # Single quaternion / multiple quaternions
-        # TODO
+        a = np.random.rand(4) - 0.5
+        b = np.random.rand(10, 4) - 0.5
+        res_lh = Quat.div_lhand(a, b)
+        res_rh = Quat.div_rhand(a, b)
+        for i, lh in enumerate(res_lh):
+            self.assertTrue(np.isclose(lh, Quat(a).div_lhand(b[i]).numpy()).all())
+        for i, rh in enumerate(res_rh):
+            self.assertTrue(np.isclose(rh, Quat(a).div_rhand(b[i]).numpy()).all())
+        b = np.asarray([[1,2,3,4], [0,0,0,0], [0,0,0,1]])
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, b)
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, b)
 
         # Multiple quaternions / single quaternion
-        # TODO
+        a = np.random.rand(10, 4) - 0.5
+        b = np.random.rand(4) - 0.5
+        while Quat(b).is_zero():
+            b = np.random.rand(4) - 0.5
+        res_lh = Quat.div_lhand(a, b)
+        res_rh = Quat.div_rhand(a, b)
+        for i, lh in enumerate(res_lh):
+            self.assertTrue(np.isclose(lh, Quat(a[i]).div_lhand(b).numpy()).all())
+        for i, rh in enumerate(res_rh):
+            self.assertTrue(np.isclose(rh, Quat(a[i]).div_rhand(b).numpy()).all())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, Quat())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_lhand(a, Quat().numpy())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, Quat())
+        with self.assertRaises(ZeroDivisionError):
+            Quat.div_rhand(a, Quat().numpy())
+
+        # Multiple quaternions / multiple quaternions
+        a = np.random.rand(10, 4) - 0.5
+        b = np.random.rand(10, 4) - 0.5
+        res_lh = Quat.div_lhand(a, b)
+        res_rh = Quat.div_rhand(a, b)
+        for i, lh in enumerate(res_lh):
+            self.assertTrue(np.isclose(lh, Quat.div_lhand(a[i], b[i])).all())
+        for i, rh in enumerate(res_rh):
+            self.assertTrue(np.isclose(rh, Quat.div_rhand(a[i], b[i])).all())
 
     ###############################
     #   End Testing of Division   #

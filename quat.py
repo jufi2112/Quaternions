@@ -4,7 +4,6 @@
     - [] conjugate_p_by_q
     - [] rotate
     - [] create from vector representation
-    - [] div
 
 """
 
@@ -1212,6 +1211,27 @@ class Quat:
         if isinstance(numerator, int) or isinstance(numerator, float):
             return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
 
+        # check if numpy arrays contain scalars
+        numerator_numpy_scalar = False
+        denominator_numpy_scalar = False
+        if isinstance(numerator, np.ndarray):
+            if (numerator.ndim == 1 and len(numerator) == 1) or (numerator.ndim == 2 and numerator.shape[1] == 1):
+                numerator_numpy_scalar = True
+        if isinstance(denominator, np.ndarray):
+            if (denominator.ndim == 1 and len(denominator) == 1) or (denominator.ndim == 2 and denominator.shape[1] == 1):
+                denominator_numpy_scalar = True
+        if numerator_numpy_scalar and denominator_numpy_scalar:
+            raise TypeError("Quat.div_lhand() is not designed for all scalar input")
+
+        # Scalar / quaternion
+        if numerator_numpy_scalar:
+            return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
+        # Quaternion / scalar
+        if denominator_numpy_scalar:
+            if np.isclose(denominator, 0).any():
+                raise ZeroDivisionError("Denominator contains zero scalar!")
+            return Quat.scalar_multiply(numerator, (1/denominator))
+
         # Quaternion / quaternion
         num, num_single, denom, denom_single = Quat._convert_and_align(numerator, denominator)
         res = Quat.hamilton_product(Quat.reciprocal(denom), num)
@@ -1252,6 +1272,27 @@ class Quat:
         # Scalar / Quaterion
         if isinstance(numerator, int) or isinstance(numerator, float):
             return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
+
+        # check if numpy arrays contain scalars
+        numerator_numpy_scalar = False
+        denominator_numpy_scalar = False
+        if isinstance(numerator, np.ndarray):
+            if (numerator.ndim == 1 and len(numerator) == 1) or (numerator.ndim == 2 and numerator.shape[1] == 1):
+                numerator_numpy_scalar = True
+        if isinstance(denominator, np.ndarray):
+            if (denominator.ndim == 1 and len(denominator) == 1) or (denominator.ndim == 2 and denominator.shape[1] == 1):
+                denominator_numpy_scalar = True
+        if numerator_numpy_scalar and denominator_numpy_scalar:
+            raise TypeError("Quat.div_rhand() is not designed for all scalar input")
+
+        # Scalar / quaternion
+        if numerator_numpy_scalar:
+            return Quat.scalar_multiply(Quat.reciprocal(denominator), numerator)
+        # Quaternion / scalar
+        if denominator_numpy_scalar:
+            if np.isclose(denominator, 0).any():
+                raise ZeroDivisionError("Denominator contains zero scalar!")
+            return Quat.scalar_multiply(numerator, (1/denominator))
 
         # Quaternion / quaternion
         num, num_single, denom, denom_single = Quat._convert_and_align(numerator, denominator)
