@@ -1,10 +1,5 @@
 """
-    TODOs
-
-    - [] conjugate_p_by_q
-    - [] rotate
-    - [] create from vector representation
-
+    Quaternion library developed by Julien Fischer
 """
 
 from __future__ import annotations
@@ -434,6 +429,54 @@ class Quat:
             Returns a copy of this quaternion.
         """
         return Quat(np.copy(self.quat_))
+
+
+    def conjugate_by(self, q: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Conjugates quaternion q to this quaternion, the result is given by
+                q @ self @ q^-1
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                Quaternion that should be conjugated to this quaternion. Can be
+                of shape (4), (1, 4), or (N, 4) for a batch of quaternions.
+
+        Returns
+        -------
+            Quat or np.ndarray of Quat:
+                This quaternion conjugated by q. If q was batched, returns a
+                numpy array of Quats.
+        """
+        qp = q @ self
+        res = Quat.hamilton_product(qp, Quat.reciprocal(q))
+        if res.ndim == 1:
+            return Quat(res)
+        return np.asarray([Quat(elem) for elem in res])
+
+
+    def conjugate_to(self, p: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Conjugates this quaternion to the given quaternion p, resulting in
+                self @ p @ self^-1
+
+        Params
+        ------
+            p (Quat or np.ndarray):
+            Quaternion to which this quaternion should be conjugated to. Can be
+            of shape (4), (1, 4), or (N, 4) for a batch of quaternions.
+
+        Returns
+        -------
+            Quat or np.ndarray of Quat:
+                This quaternion conjugated to p. If p was batched, returns a numpy
+                array of Quats.
+        """
+        qp = self @ p
+        res = Quat.hamilton_product(qp, self.reciprocal())
+        if res.ndim == 1:
+            return Quat(res)
+        return np.asarray([Quat(elem) for elem in res])
 
 
     def _instance_norm(self) -> float:
@@ -1300,3 +1343,207 @@ class Quat:
         if num_single and denom_single:
             return res[0]
         return res
+
+
+    @staticmethod
+    def conjugate_p_by_q(q: Union[Quat, np.ndarray], p: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Conjugates quaternion p by q. The result is the conjugation
+                q @ p @ q^-1
+            Quaternions q and p can be batched (shapes (N, 4) and (4), (4) and (N, 4), or
+            (N, 4) and (N, 4) are allowed). (4) can also be represented by (1, 4).
+            If p is a vector quaternion representing a position P, and q is a unit quaternion
+            representing a rotation R, the result is a vector quaternion representing the new
+            position R @ P when point P is rotated by R.
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                Quaternion(s) q that should be conjugated to p. Can be of shape (4), (1, 4), or (N, 4).
+            p (Quat or np.ndarray):
+                Quaternion(s) p which should be conjugated by q. Can be of shape (4), (1, 4), or (N, 4).
+
+        Returns
+        -------
+            np.ndarray:
+                The result of the conjugation, i.e. q @ p @ q^-1
+        """
+        if (not isinstance(q, Quat) and not isinstance(q, np.ndarray)) or (not isinstance(p, Quat) and not isinstance(p, np.ndarray)):
+            raise TypeError(f"Expected q and p to be of types Quat or np.ndarray but got types {type(q)} and {type(p)}")
+
+        q, q_single, p, p_single = Quat._convert_and_align(q, p)
+        q_reciprocal = Quat.reciprocal(q)
+        qp = Quat.hamilton_product(q, p)
+        res = Quat.hamilton_product(qp, q_reciprocal)
+        if q_single and p_single:
+            return res[0]
+        return res
+
+
+    @staticmethod
+    def from_point(p: np.ndarray) -> Union[Quat, np.ndarray]:
+        """
+            Returns the representation of point p = (x, y, z) as vector
+            quaternion p' with
+                p' = 0 + xi + yj + zk
+
+        Params
+        ------
+            p (np.ndarray):
+                Point which should be represented as vector quaternion.
+                Can be of shape (3) or (N, 3)
+        """
+        if not isinstance(p, np.ndarray):
+            raise TypeError(f"Expected argument p to be of type np.ndarray but got type {type(p)}")
+        if p.ndim == 1 and len(p) == 3:
+            return Quat(0, p[0], p[1], p[2])
+        elif p.ndim == 2 and p.shape[1] == 3:
+            return np.asarray([Quat(0, elem[0], elem[1], elem[2]) for elem in p])
+        else:
+            raise ValueError(f"Expected argument p to be of shape (3) or (N, 3) but got shape {p.shape}")
+
+
+    @staticmethod
+    def from_rot_vec(rot_vec: np.ndarray) -> Union[Quat, np.ndarray]:
+        """
+            Calculates a rotation quaternion (i.e. versor, unit quaternion) from the given rotation vector.
+            The rotation angle theta (in radians) is determined from the length of the rotation
+            vector, while the rotation axis (x,y,z) is given by the normed rotation vector.
+            Uses quaternion polar decomposition (via Taylor expansion of the exponential
+            function) to determine rotation quaternion:
+            q = exp(theta * rot_axis) [where rot_axis is vector quaternion representing the
+                                    rotation axis]
+            q = (cos(theta/2) + x * sin(theta/2)i + y * sin(theta/2)j + z * sin(theta/2)k)
+
+        Params
+        ------
+            rot_vec (np.ndarray):
+                Rotation vector(s) from which the quaternion(s) should be created.
+                Can be of shape (3) or (N, 3)
+
+        Returns
+        -------
+            Quat or np.ndarray of Quats:
+                The calculated rotation quaternions. If rot_vec was batched, returns
+                an array of Quats.
+        """
+        single = False
+        if rot_vec.ndim == 1:
+            single = True
+            rot_vec = rot_vec.reshape(1, -1)
+        if rot_vec.shape[1] != 3:
+            raise ValueError(f"Expected rot_vec to have shape (3) or (N, 3) but got shape {rot_vec.shape}")
+        angles = np.linalg.norm(rot_vec, axis=1).reshape(-1, 1)
+        if np.isclose(angles, 0).any():
+            raise ZeroDivisionError("Rotation vector has length 0!")
+        euler_axes = rot_vec / angles
+        angles = angles.reshape(-1, 1)
+        q = np.concatenate((np.cos(angles/2),
+                            euler_axes * np.sin(angles/2)
+                            ), axis=1, dtype=np.float64)
+        if single:
+            return Quat(q[0])
+        return np.asarray([Quat(elem) for elem in q])
+
+
+    @staticmethod
+    def from_axis_and_angle(axis: np.ndarray, angle: np.ndarray) -> Union[Quat, np.ndarray]:
+        """
+            Calculates a rotation quaternion (i.e. versor) from given rotation axis and
+            rotation angle. See `Quat.from_rot_vec` for details
+
+        Params
+        ------
+            axis (np.ndarray):
+                Euler axis. Can be of shape (3) or (N, 3)
+            angle (np.ndarray):
+                Rotation angles. Can be of shape (1) or (N, 1)
+
+        Returns
+        -------
+            Quat or np.ndarray of Quats:
+                The rotation quaternions. If axis or angle was batched, returns
+                an array of Quats.
+        """
+        axis_single = False
+        angle_single = False
+        if axis.ndim == 1:
+            axis_single = True
+            axis = axis.reshape(1, -1)
+        if isinstance(angle, int) or isinstance(angle, float):
+            angle = np.asarray([angle])
+        if angle.ndim == 1:
+            angle_single = True
+            angle = angle.reshape(1, -1)
+        if axis.shape[1] != 3:
+            raise ValueError(f"Expected axis to have shape (3) or (N, 3) but got shape {axis.shape}")
+        if angle.shape[1] != 1:
+            raise ValueError(f"Expected angle to have shape (1) or (N, 1) but got shape {angle.shape}")
+        if axis.shape[0] == 1 and angle.shape[0] > 1:
+            axis = np.tile(axis, (angle.shape[0], 1))
+        if angle.shape[0] == 1 and axis.shape[0] > 1:
+            angle = np.tile(angle, (axis.shape[0], 1))
+        assert axis.shape[0] == angle.shape[0], f"Axes and angles have to have the same batch size, got {axis.shape[0]} and {angle.shape[0]}"
+
+        norms = np.linalg.norm(axis, axis=1).reshape(-1 ,1)
+        if np.isclose(norms, 0).any():
+            raise ZeroDivisionError("One of the given axes has length zero!")
+        axis = axis / norms
+        q = np.concatenate((np.cos(angle/2),
+                            axis * np.sin(angle/2)
+                            ), axis=1, dtype=np.float64)
+        if axis_single and angle_single:
+            return Quat(q[0])
+        return np.asarray([Quat(elem) for elem in q])
+
+
+    @staticmethod
+    def rotate_point(p: Union[Quat, np.ndarray], q: Union[Quat, np.ndarray]) -> Union[Quat, np.ndarray]:
+        """
+            Rotates point p by quaternion q.
+
+        Params
+        ------
+            p (Quat or np.ndarray):
+                Point p that should be rotated. Can be an actual point (shape (3)
+                or (N, 3)) or a vector quaternion that represents point p (shape (4) or (N, 4))
+            q (Quat or np.ndarray):
+                Rotation quaternion. Can be of shape (4) or (N, 4).
+        """
+        if isinstance(p, np.ndarray):
+            if (p.ndim == 1 and len(p) == 3) or (p.ndim == 2 and p.shape[1] == 3):
+                if p.ndim == 1 and isinstance(p[0], Quat):
+                    pass
+                else:
+                    p = Quat.from_point(p)
+        res = Quat.conjugate_p_by_q(q, p)
+        if res.ndim == 1:
+            return Quat(res)
+        return np.asarray([Quat(elem) for elem in res])
+
+
+    @staticmethod
+    def rotate(point: np.ndarray, axis: np.ndarray, angle: Union[int, float, np.ndarray]) -> np.ndarray:
+        """
+            Uses quaternions to rotate the given point along the given axis by the
+            given angle (in radians).
+
+        Params
+        ------
+            point (np.ndarray):
+                Point that should be rotated, can be of shape (3) or (N, 3)
+            axis (np.ndarray):
+                The axis the given point should be rotated around. Can be of
+                shape (3) or (N, 3).
+            angle (np.ndarray):
+                The angle in radians by which the point should be rotated.
+                Can be of shape (1) or (N, 1)
+        """
+        q = Quat.from_axis_and_angle(axis, angle)
+        p = Quat.from_point(point)
+        p_rot = Quat.rotate_point(p, q)
+        if isinstance(p_rot, np.ndarray):
+            return np.asarray([elem.vector() for elem in p_rot]).reshape(-1, 3)
+        if isinstance(p_rot, Quat):
+            return p_rot.vector()
+        raise ValueError("Quat.rotate_point() returned invalid type")

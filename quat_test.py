@@ -17,6 +17,173 @@ class TestQuat(unittest.TestCase):
         self.assertTrue((b.numpy() == a).all())
 
 
+    def test_from_point(self):
+        with self.assertRaises(TypeError):
+            Quat.from_point(1)
+        with self.assertRaises(TypeError):
+            Quat.from_point("test")
+        with self.assertRaises(ValueError):
+            Quat.from_point(np.random.rand(2))
+        with self.assertRaises(ValueError):
+            Quat.from_point(np.random.rand(5, 4))
+        p = np.random.rand(3) - 0.5
+        q = Quat.from_point(p)
+        self.assertIsInstance(q, Quat)
+        self.assertTrue(np.isclose(q.vector(), p).all())
+        self.assertTrue(q.is_pure())
+        ps = np.random.rand(10, 3) - 0.5
+        qs = Quat.from_point(ps)
+        self.assertIsInstance(qs, np.ndarray)
+        for i, q in enumerate(qs):
+            self.assertIsInstance(q, Quat)
+            self.assertTrue(np.isclose(q.vector(), ps[i]).all())
+            self.assertTrue(q.is_pure())
+
+
+    # This tests multiple components at once
+    def test_rotation(self):
+        def calc_rotation(axis, angle, point):
+            q = Quat.from_axis_and_angle(axis, angle)
+            p = Quat.from_point(point)
+            p_rot = Quat.rotate_point(p, q)
+            p_hat = p_rot.vector()
+            return p_hat
+        axis = np.asarray([0,0,1])
+        angle = np.pi / 2
+        point = np.asarray([2,0,0])
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([0,2,0])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        angle = np.pi
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([-2,0,0])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        angle = 3/2 * np.pi
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([0,-2,0])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        angle = 2 * np.pi
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([2,0,0])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        axis = np.asarray([0,1,0])
+        angle = np.pi/2
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([0,0,-2])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        axis = np.asarray([1,0,0])
+        point = np.asarray([0,2,0])
+        p_hat = calc_rotation(axis = axis,
+                              angle = angle,
+                              point = point
+                              )
+        self.assertTrue(np.isclose(p_hat, np.asarray([0,0,2])).all())
+        self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
+
+        # rotate multiple points by same axis and angle
+        points = np.asarray([[1,0,0], [2,0,0], [0,2,0], [0,0,3]])
+        axis = np.asarray([0,0,3])
+        angle = np.pi / 2
+        p_hat = Quat.rotate(points, axis, angle)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([0,1,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([0,2,0])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([-2,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[3], np.asarray([0,0,3])).all())
+
+        # rotate same point by same axis but multiple angles
+        point = np.asarray([1,0,0])
+        axis = np.asarray([0,0,1])
+        angles = np.asarray([np.pi / 2, np.pi, 3/2 * np.pi, 2 * np.pi]).reshape(-1, 1)
+        p_hat = Quat.rotate(point, axis, angles)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([0,1,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([-1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([0,-1,0])).all())
+        self.assertTrue(np.isclose(p_hat[3], np.asarray([1,0,0])).all())
+
+        # rotate same point by same angle but around different axes
+        point = np.asarray([1,0,0])
+        angle = np.pi
+        axes = np.asarray([[1,0,0], [0,1,0], [0,0,1]])
+        p_hat = Quat.rotate(point, axes, angle)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([-1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([-1,0,0])).all())
+
+        # rotate 3 different points by 3 different angles around 3 different axes
+        points = np.asarray([[1,0,0], [0,1,0], [0,0,1]])
+        angles = np.asarray([np.pi, np.pi / 2, 3/2 * np.pi]).reshape(-1, 1)
+        axes = np.asarray([[0,0,1], [1,0,0], [0,1,0]])
+        p_hat = Quat.rotate(points, axes, angles)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([-1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([0,0,1])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([-1,0,0])).all())
+
+        # rotate 3 different points around 3 different axes by the same angle
+        angle = np.pi / 2
+        points = np.asarray([[1,0,0], [0,1,0], [0,0,1]])
+        axes = np.asarray([[0,0,1], [1,0,0], [0,1,0]])
+        p_hat = Quat.rotate(points, axes, angle)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([0,1,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([0,0,1])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([1,0,0])).all())
+
+        # rotate the same point around 3 different axes by 3 different angles
+        point = np.asarray([1,0,0])
+        axes = np.asarray([[1,0,0], [0,1,0], [0,0,1]])
+        angles = np.asarray([np.pi, np.pi/2, 3/2*np.pi]).reshape(-1, 1)
+        p_hat = Quat.rotate(point, axes, angles)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([0,0,-1])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([0,-1,0])).all())
+
+        # rotate 3 different points by 3 different angles around the same axis
+        axis = np.asarray([0,0,1])
+        points = np.asarray([[1,0,0], [2,0,0], [3,0,0]])
+        angles = np.asarray([np.pi, 3/2 * np.pi, 5/2 * np.pi]).reshape(-1, 1)
+        p_hat = Quat.rotate(points, axis, angles)
+        self.assertIsInstance(p_hat, np.ndarray)
+        self.assertTrue(np.isclose(p_hat[0], np.asarray([-1,0,0])).all())
+        self.assertTrue(np.isclose(p_hat[1], np.asarray([0,-2,0])).all())
+        self.assertTrue(np.isclose(p_hat[2], np.asarray([0,3,0])).all())
+
+        # make sure angles have to be formatted correctly
+        angles = angles.reshape(-1)
+        with self.assertRaises(ValueError):
+            Quat.rotate(points, axis, angles)
+        # make sure that batch dimensions of all arrays are compatible
+        axes = np.asarray([[1,0,0], [0,1,0]])
+        points = np.asarray([[0,0,1], [0,0,1], [0,0,1]])
+        angles = np.asarray([np.pi, np.pi, np.pi, np.pi]).reshape(-1, 1)
+        with self.assertRaises(AssertionError):
+            Quat.rotate(points, axes, angles)
+
+
     def test_repr(self):
         a = np.random.rand(4) - 0.5
         b = Quat(a)
@@ -1890,6 +2057,10 @@ class TestQuat(unittest.TestCase):
     ###########################
 
 
+    ####################################
+    #   Start Testing of Conjugation   #
+    ####################################
+
     def test_static_conjugate(self):
         a = np.random.rand(4) - 0.5
         b = np.random.rand(10, 4) - 0.5
@@ -1908,6 +2079,11 @@ class TestQuat(unittest.TestCase):
         b.conjugate_()
         self.assertIsInstance(b, Quat)
         self.assertTrue((a*conj_arr == b.numpy()).all())
+
+
+    ##################################
+    #   End Testing of Conjugation   #
+    ##################################
 
 
 if __name__ == '__main__':
