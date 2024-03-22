@@ -100,6 +100,30 @@ class TestQuat(unittest.TestCase):
         self.assertTrue(np.isclose(p_hat, np.asarray([0,0,2])).all())
         self.assertTrue(np.isclose(p_hat, Quat.rotate(point, axis, angle)).all())
 
+        # Rotate same point by different quaternions
+        r = Quat.from_axis_and_angle(axis=np.asarray([[0,1,0], [0,0,1]]),
+                                     angle=np.asarray([[np.pi/2], [3/2*np.pi]])
+                                     )
+        self.assertIsInstance(r, np.ndarray)
+        for x in r:
+            self.assertIsInstance(x, Quat)
+        r_np = np.asarray([x.numpy() for x in r])
+        self.assertTrue(r_np.ndim == 2 and r_np.shape[0] == 2 and r_np.shape[1] == 4)
+        point = np.asarray([2.5, 0, 1])
+        y = Quat.rotate_point(point, r)
+        y_np = Quat.rotate_point(point, r_np)
+        self.assertIsInstance(y, np.ndarray)
+        for x in y:
+            self.assertIsInstance(x, Quat)
+        print(y[0].vector())
+        self.assertTrue(np.isclose(y[0].vector(), np.asarray([1, 0, -2.5])).all())
+        self.assertTrue(np.isclose(y[1].vector(), np.asarray([0, -2.5, 1])).all())
+        self.assertIsInstance(y_np, np.ndarray)
+        for x in y_np:
+            self.assertIsInstance(x, Quat)
+        self.assertTrue(np.isclose(y_np[0].vector(), np.asarray([1, 0, -2.5])).all())
+        self.assertTrue(np.isclose(y_np[1].vector(), np.asarray([0, -2.5, 1])).all())
+
         # rotate multiple points by same axis and angle
         points = np.asarray([[1,0,0], [2,0,0], [0,2,0], [0,0,3]])
         axis = np.asarray([0,0,3])
