@@ -46,6 +46,7 @@ class Quat:
         self.reciprocal = self._instance_reciprocal
         self.div_lhand = self._instance_div_lhand
         self.div_rhand = self._instance_div_rhand
+        self.to_rot_vec = self._instance_to_rot_vec
 
 
     def __str__(self):
@@ -711,6 +712,25 @@ class Quat:
             else:
                 raise ValueError(f"Expected other array to have shape (1), (4), (N, 1), or (N, 4) but got shape {other.shape}")
         raise TypeError(f"Expected type int, float, Quat, or np.ndarray, got {type(other)}")
+
+
+    def _instance_to_rot_vec(self) -> np.ndarray:
+        """
+            Converts this quaternion to a rotation vector
+
+        Returns
+        -------
+            np.ndarray:
+                The rotation vector that describes the rotation of this normed quaternion.
+                Shape (3)
+        """
+        q = self.normalize()
+        angle = 2* np.arccos(q.scalar())
+        denominator = np.sqrt(1 - q.scalar() * q.scalar())
+        if np.isclose(denominator, 0):
+            raise ZeroDivisionError("Denominator is zero!")
+        vec = q.vector() / denominator
+        return vec * angle
 
 
     def normalize_(self) -> Quat:
@@ -1585,3 +1605,77 @@ class Quat:
         if return_float_array:
             return quats
         return np.asarray([Quat(elem) for elem in quats])
+
+
+    @staticmethod
+    def to_rot_vec(q: Union[Quat, np.ndarray]) -> np.ndarray:
+        """
+            Converts the given quaternion to rotation vectors.
+            The quaternions do not need to be normalized.
+            This is the inverse of Quat.from_rot_vec(), although the resulting
+            rotation vectors may not have the same length if the original
+            vector had norm > 2 pi.
+
+        Params
+        ------
+            q (Quat or np.ndarray):
+                The quaternions that should be converted to rotation vectors.
+                Can be of shape (4) or (N, 4)
+
+        Returns
+        -------
+            np.ndarray:
+                The resulting rotation vectors of shape (3) or (N, 3)
+        """
+        if isinstance(q, Quat):
+            q = q.numpy()
+        if isinstance(q, np.ndarray):
+            if q.ndim == 1 and isinstance(q[0], Quat):
+                q = Quat.quat_array_to_float_array(q)
+            q_single = False
+            if q.ndim == 1:
+                q_single = True
+                q = q.reshape(1, -1)
+            if q.shape[1] != 4:
+                raise ValueError(f"Expected argument q to have shape (3) or (N, 3) but got shape {q.shape}")
+            q = Quat.normalize(q)
+            scalars = q[..., 0]
+            vectors = q[..., 1:]
+            angles = 2* np.arccos(scalars)
+            denominators = np.sqrt(1 - scalars * scalars)
+            if np.isclose(denominators, 0).any():
+                raise ZeroDivisionError("At least one of the denominators is zero!")
+            vec = vectors / denominators.reshape(-1, 1)
+            res = vec * angles.reshape(-1, 1)
+            if q_single:
+                return res[0]
+            return res
+        raise TypeError(f"Expected argument q to be of type Quat or np.ndarray but got type {type(q)}")
+
+
+    @staticmethod
+    def quat_array_to_float_array(arr: np.ndarray) -> np.ndarray:
+        """
+            Converts a np.ndarray of Quat elements to a np.ndarray of np.float64 elements
+
+        Params
+        ------
+            arr (np.ndarray):
+                Numpy array of Quat objects, shape (N)
+
+        Returns
+        -------
+            np.ndarray:
+                Numpy array with float64 elements that represent quaternions, shape (N, 4)
+        """
+        if arr.ndim != 1:
+            arr = arr.flatten()
+        if not isinstance(arr[0], Quat):
+            raise ValueError(f"Expected arr to consist of objects from type Quat but got type {type(arr[0])}")
+        arr_single = False
+        if len(arr) == 1:
+            arr_single = True
+        res = np.asarray([elem.numpy() for elem in arr])
+        if arr_single:
+            return res[0]
+        return res

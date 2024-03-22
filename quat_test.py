@@ -40,6 +40,38 @@ class TestQuat(unittest.TestCase):
             self.assertTrue(q.is_pure())
 
 
+    def test_quat_array_to_float_array(self):
+        a = np.random.rand(100, 4) - 0.5
+        q = np.asarray([Quat(elem) for elem in a])
+        b = Quat.quat_array_to_float_array(q)
+        self.assertTrue(np.isclose(a, b).all())
+        a = np.random.rand(4) - 0.5
+        q = np.asarray([Quat(a)])
+        b = Quat.quat_array_to_float_array(q)
+        self.assertTrue(np.isclose(a, b).all())
+        self.assertTrue(b.ndim == 1)
+
+
+    def test_to_rot_vec(self):
+        axis = np.random.rand(3) - 0.5
+        # angle needs to be in [0, 2 * pi]
+        angle = 3/2 * np.pi
+        rot_vec_gt = axis / np.linalg.norm(axis)
+        rot_vec_gt *= angle
+        q = Quat.from_rot_vec(rot_vec_gt)
+        rot_vec_pred = q.to_rot_vec()
+        self.assertTrue(np.isclose(rot_vec_gt, rot_vec_pred).all())
+
+        axes = np.random.rand(10, 3) - 0.5
+        # angles need to be in [0, 2 * pi]
+        angles = np.random.rand(10, 1) * 2 * np.pi
+        rot_vecs_gt = axes / np.linalg.norm(axes, axis=1).reshape(-1, 1)
+        rot_vecs_gt *= angles
+        quats = Quat.from_rot_vec(rot_vecs_gt)
+        rot_vecs_pred = Quat.to_rot_vec(quats)
+        self.assertTrue(np.isclose(rot_vecs_pred, rot_vecs_gt).all())
+
+
     def test_generate_random_rotations(self):
         num_samples = 100
         q = Quat.generate_random_rotations(num_samples,
