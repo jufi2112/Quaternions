@@ -40,6 +40,22 @@ class TestQuat(unittest.TestCase):
             self.assertTrue(q.is_pure())
 
 
+    def test_generate_random_rotations(self):
+        num_samples = 100
+        q = Quat.generate_random_rotations(num_samples,
+                                           return_float_array=False)
+        self.assertIsInstance(q, np.ndarray)
+        for x in q:
+            self.assertIsInstance(x, Quat)
+            self.assertTrue(np.isclose(x.norm(), 1))
+        q = Quat.generate_random_rotations(num_samples,
+                                           return_float_array=True)
+        self.assertIsInstance(q, np.ndarray)
+        for x in q:
+            self.assertIsInstance(x, np.ndarray)
+        self.assertTrue(np.isclose(Quat.norm(q), 1).all())
+
+
     # This tests multiple components at once
     def test_rotation(self):
         def calc_rotation(axis, angle, point):
@@ -115,7 +131,6 @@ class TestQuat(unittest.TestCase):
         self.assertIsInstance(y, np.ndarray)
         for x in y:
             self.assertIsInstance(x, Quat)
-        print(y[0].vector())
         self.assertTrue(np.isclose(y[0].vector(), np.asarray([1, 0, -2.5])).all())
         self.assertTrue(np.isclose(y[1].vector(), np.asarray([0, -2.5, 1])).all())
         self.assertIsInstance(y_np, np.ndarray)

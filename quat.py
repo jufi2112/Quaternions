@@ -1547,3 +1547,41 @@ class Quat:
         if isinstance(p_rot, Quat):
             return p_rot.vector()
         raise ValueError("Quat.rotate_point() returned invalid type")
+
+
+    @staticmethod
+    def generate_random_rotations(num_samples: int,
+                                  return_float_array: bool,
+                                  np_rng: np.random.Generator = None,
+                                  np_random_seed = None,
+                                  ) -> np.ndarray:
+        """
+            Generates random rotation quaternions.
+
+        Params
+        ------
+            num_samples (int):
+                Number of random rotation quaternions that should be generated
+            return_pure_np_array (bool):
+                Whether the returned array should consist of np.float64 values that
+                represent the generated quaternions or consist of Quat objects
+            np_rng (np.random.Generator):
+                Numpy random generator that should be used. If None, uses default_rng
+            np_random_seed:
+                Random seed to use if a default_rng generator is created.
+
+        Returns
+        -------
+            np.ndarray:
+                The generated quaternions. If return_float_array is True, the
+                array will be of shape (N, 4) and dtype np.float64. If
+                return_float_array is False, the array will be of shape (N) and
+                consist of Quat objects.
+        """
+        if np_rng is None:
+            np_rng = np.random.default_rng(seed=np_random_seed)
+        q = np_rng.standard_normal(num_samples*4).reshape(-1, 4)
+        quats = Quat.normalize(q)
+        if return_float_array:
+            return quats
+        return np.asarray([Quat(elem) for elem in quats])
