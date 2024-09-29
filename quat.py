@@ -1455,8 +1455,14 @@ class Quat:
             raise ValueError(f"Expected rot_vec to have shape (3) or (N, 3) but got shape {rot_vec.shape}")
         angles = np.linalg.norm(rot_vec, axis=1).reshape(-1, 1)
         if np.isclose(angles, 0).any():
-            raise ZeroDivisionError("Rotation vector has length 0!")
-        euler_axes = rot_vec / angles
+            indices = np.where(np.isclose(angles, 0))[0]
+            angles[indices] = 1
+            euler_axes = rot_vec / angles
+            euler_axes[indices] = np.asarray([1,0,0])
+            angles[indices] = 0
+            #raise ZeroDivisionError("Rotation vector has length 0!")
+        else:
+            euler_axes = rot_vec / angles
         angles = angles.reshape(-1, 1)
         q = np.concatenate((np.cos(angles/2),
                             euler_axes * np.sin(angles/2)
@@ -1470,14 +1476,14 @@ class Quat:
     def from_axis_and_angle(axis: np.ndarray, angle: np.ndarray) -> Union[Quat, np.ndarray]:
         """
             Calculates a rotation quaternion (i.e. versor) from given rotation axis and
-            rotation angle. See `Quat.from_rot_vec` for details
+            rotation angle (in radians). See `Quat.from_rot_vec` for details
 
         Params
         ------
             axis (np.ndarray):
                 Euler axis. Can be of shape (3) or (N, 3)
             angle (np.ndarray):
-                Rotation angles. Can be of shape (1) or (N, 1)
+                Rotation angles in radians. Can be of shape (1) or (N, 1)
 
         Returns
         -------
