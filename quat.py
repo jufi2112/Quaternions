@@ -1424,7 +1424,9 @@ class Quat:
 
 
     @staticmethod
-    def from_rot_vec(rot_vec: np.ndarray) -> Union[Quat, np.ndarray]:
+    def from_rot_vec(rot_vec: np.ndarray,
+                     return_raw_numpy: bool = False
+                     ) -> Union[Quat, np.ndarray]:
         """
             Calculates a rotation quaternion (i.e. versor, unit quaternion) from the given rotation vector.
             The rotation angle theta (in radians) is determined from the length of the rotation
@@ -1440,6 +1442,9 @@ class Quat:
             rot_vec (np.ndarray):
                 Rotation vector(s) from which the quaternion(s) should be created.
                 Can be of shape (3) or (N, 3)
+            return_raw_numpy (bool):
+                Whether a raw numpy array (potentially of shape (B, 4)) should
+                be returned. Defaults to False.
 
         Returns
         -------
@@ -1463,7 +1468,10 @@ class Quat:
                             ), axis=1, dtype=np.float64)
         if single:
             return Quat(q[0])
-        return np.asarray([Quat(elem) for elem in q])
+        if return_raw_numpy:
+            return q
+        else:
+            return np.asarray([Quat(elem) for elem in q])
 
 
     @staticmethod
